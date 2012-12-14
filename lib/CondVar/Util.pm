@@ -11,6 +11,7 @@ our @ISA = qw( Exporter );
 
 our %EXPORT_TAGS = ( all => [ qw(
     cv
+    cv_eval
     cv_timer
     then
     with
@@ -26,18 +27,34 @@ our @EXPORT_OK = @{ $EXPORT_TAGS{ all } };
 
 our $VERSION = '0.01';
 
+sub is_condvar {
+    my $val = shift;
+    defined $val && ref( $val ) eq 'AnyEvent::CondVar';
+}
+
+sub is_coderef {
+    my $val = shift;
+    defined $val && ref( $val ) eq 'CODE';
+}
+
 sub cv {
-    my $res = shift;
+    my $val = shift;
 
-    return $res 
-        if defined $res and ref( $res ) eq 'AnyEvent::CondVar'; 
-
-    return cv( $res->() )
-        if defined $res and ref( $res ) eq 'CODE';
+    return $val if is_condvar( $val );
 
     my $cv = AnyEvent::condvar;
-    $cv->send( $res, @_ );
+    $cv->send( $val, @_ );
     $cv;
+}
+
+sub cv_eval {
+    my $val = shift;
+
+    return $val if is_condvar( $val );
+
+    is_coderef( $val ) ?
+        cv_eval( $val->() ) :
+        cv( $val, @_ );
 }
 
 sub cv_and {
@@ -52,7 +69,7 @@ sub cv_and {
 
     for my $i ( 0..$#args ){
         $cv->begin;
-        cv( $args[$i] )->cb( sub {
+        cv_eval( $args[$i] )->cb( sub {
             $result[$i] = [ shift->recv ];
             $cv->end;
         });
@@ -68,7 +85,7 @@ sub cv_or {
     my $done = 0;
     my $cv = AnyEvent::condvar;
     
-    cv( $_ )->cb( sub {
+    cv_eval( $_ )->cb( sub {
         return if $done;
         $done = 1;
         $cv->send( shift->recv );
@@ -85,11 +102,12 @@ sub cv_chain(&@) {
     my $fp = undef;
     foreach my $fn ( reverse @fns ) {
         my $next = $fp; $fp = sub {
-            cv( $fn->( @_ ) )->cb( sub {
-                defined $next ?
+            my @res = $fn->( @_ );
+            cv( @res )->cb( sub {
+                defined $next && is_condvar( @res ) ?
                     $next->( shift->recv ) :
                     $cv->send( shift->recv );
-            });  
+            });
         };
     }
     $fp->();

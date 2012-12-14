@@ -19,15 +19,15 @@ ok_cv(
 );
 
 ok_cv(
-    cv( sub{ sub{ ( 1, 2, 3 ) } } ),
-    [ 1, 2, 3 ],
-    'cv recursively evalutes functions passed as argument'
-);
-
-ok_cv(
     cv( cv(2) ),
     [ 2 ],
     'cv returns its argument if its a condvar'
+);
+
+ok_cv(
+    cv_eval( sub{ sub{ ( 1, 2, 3 ) } } ),
+    [ 1, 2, 3 ],
+    'cv_eval recursively evalutes functions passed as argument'
 );
 
 ok_cv(
@@ -70,6 +70,19 @@ ok_cv(
     }),
     [ 1, 2, 3 ],
     'cv_chain chains the result of a condvar with the next function'
+);
+
+
+ok_cv(
+    (cv_chain {
+        cv_timer( 0.1 => sub{ 3 } );
+    } with {
+        return ( shift, 2, 1 );
+    } with {
+        cv_timer( 0.1 => sub{ ( 1, 2, 3 ) } );
+    }),
+    [ 3, 2, 1 ],
+    'cv_chain returns from the chain if no condvar is seen'
 );
 
 ok_cv(
