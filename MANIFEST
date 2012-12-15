@@ -1,6 +1,7 @@
 Changes
 Makefile.PL
 MANIFEST
-README
+README.pod
+LICENSE
 t/CondVar-Util.t
 lib/CondVar/Util.pm

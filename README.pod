@@ -1,0 +1,99 @@
+= pod 
+
+=head1 CondVar::Util 
+
+L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
+is a great Perl event-loop library for doing asynchronous
+programming.  It uses condition variables as a powerful
+primitive to control the flow, or the continuation, of an
+asynchronous program.
+
+Check out the great L<AnyEvent
+documentation|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
+on condition variables.
+
+This module provides simple tools for manipulating condition
+variables.  It should help you reduce the amount of embedded
+callbacks in your code as well as make it easier to read. I
+hope you find it usefull.
+
+=head2 How to use
+
+Most functions in this library take condition variables as
+input and return a condition variable. They essentially wrap
+condition variables together to produce desired functionality.
+
+Here's a simple example using C<cv_and>. If you've got a
+database library C<$db> that returns condition variables, you
+can write this:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_and {
+        $db->get( 'elem1' ),
+        $db->get( 'elem2' ),
+    };
+
+    $cv->cb( sub {
+        my ( $elem1, $elem2 ) = @_;
+    });
+
+Calling C<cv_and> will create a condition variable that will wait
+for all the database reads to complete. Additionally, the
+condition variable will return an ordered list of results.
+Functionally, this is an B<AND> condition as you require all
+input condition variables to return before you can continue.
+
+Similarily, you can use C<cv_or> which will create a condition
+variable that returns as soon as any of the input condition
+variables returns.
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_or {
+        ping( 'mirror1' ),
+        ping( 'mirror2' ),
+        ping( 'mirror3' ),
+    };
+
+    $cv->cb( sub {
+        my $first_mirror = shift;
+    });
+
+Here we ping 3 different mirrors in parallel and wait for the
+first mirror to respond (the fastest mirror).
+
+=head2 Installation
+
+    perl Makefile.PL
+    make
+    make test
+    make install
+
+=head2 Dependencies
+
+    L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
+
+=head2 Copyright and license
+
+Copyright (C) 2012 ciphermonk
+
+This program is free software: you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public
+License along with this program.  If not, see
+<http://www.gnu.org/licenses/>
+
+=cut
+
+
