@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use AnyEvent;
+use Carp;
 
 require Exporter;
 
@@ -11,10 +12,9 @@ our @ISA = qw( Exporter );
 
 our %EXPORT_TAGS = ( all => [ qw(
     cv
-    cv_eval
     cv_timer
-    then
-    with
+    cv_then
+    cv_with
     cv_and
     cv_or
     cv_chain
@@ -32,33 +32,15 @@ sub is_condvar {
     defined $val && ref( $val ) eq 'AnyEvent::CondVar';
 }
 
-sub is_coderef {
-    my $val = shift;
-    defined $val && ref( $val ) eq 'CODE';
-}
-
 sub cv {
-    my $val = shift;
-
-    return $val if is_condvar( $val );
-
+    return shift if is_condvar( @_ );
     my $cv = AnyEvent::condvar;
-    $cv->send( $val, @_ );
+    $cv->send( @_ );
     $cv;
 }
 
-sub cv_eval {
-    my $val = shift;
-
-    return $val if is_condvar( $val );
-
-    is_coderef( $val ) ?
-        cv_eval( $val->() ) :
-        cv( $val, @_ );
-}
-
-sub cv_and {
-    my @args = @_;
+sub cv_and(&@) {
+    my @cvs = map { $_->() } @_;
 
     my @result;
     my $cv = AnyEvent::condvar;
@@ -67,9 +49,9 @@ sub cv_and {
         $cv->send( map{ @$_ } @result ); 
     });
 
-    for my $i ( 0..$#args ){
+    for my $i ( 0..$#cvs ){
         $cv->begin;
-        cv_eval( $args[$i] )->cb( sub {
+        $cvs[$i]->cb( sub {
             $result[$i] = [ shift->recv ];
             $cv->end;
         });
@@ -79,17 +61,17 @@ sub cv_and {
     $cv;
 }
 
-sub cv_or {
-    my @args = @_;
+sub cv_or(&@) {
+    my @cvs = map { $_->() } @_;
 
     my $done = 0;
     my $cv = AnyEvent::condvar;
     
-    cv_eval( $_ )->cb( sub {
+    $_->cb( sub {
         return if $done;
         $done = 1;
         $cv->send( shift->recv );
-    }) for ( @args );
+    }) for ( @cvs );
 
     $cv;
 }
@@ -102,12 +84,14 @@ sub cv_chain(&@) {
     my $fp = undef;
     foreach my $fn ( reverse @fns ) {
         my $next = $fp; $fp = sub {
-            my @res = $fn->( @_ );
-            cv( @res )->cb( sub {
-                defined $next && is_condvar( @res ) ?
-                    $next->( shift->recv ) :
-                    $cv->send( shift->recv );
-            });
+            my ( $x, @xs ) = $fn->( @_ );
+            is_condvar( $x ) ?
+                $x->cb( sub {
+                    defined $next ?
+                        $next->( shift->recv ) :
+                        $cv->send( shift->recv );
+                }) :
+                $cv->send( $x, @xs );
         };
     }
     $fp->();
@@ -115,15 +99,15 @@ sub cv_chain(&@) {
     $cv;
 }
 
-sub then(&@) { @_ }
-sub with(&@) { @_ }
+sub cv_then(&@) { @_ }
+sub cv_with(&@) { @_ }
 
 sub cv_wrap(&$) {
     my ( $fn, $cv ) = @_;
 
     my $cv_wrap = AnyEvent::condvar;
 
-    cv( $cv )->cb( sub {
+    $cv->cb( sub {
         $cv_wrap->send( 
             $fn->( shift->recv ) );
     });
@@ -133,7 +117,7 @@ sub cv_wrap(&$) {
 
 sub cv_map(&@) {
     my ( $fn, @list ) = @_;
-    cv_and( map { $fn->() } @list );
+    cv_and { map { $fn->() } @list };
 }
 
 sub cv_grep(&@) {
@@ -143,7 +127,7 @@ sub cv_grep(&@) {
             my $elem = $_;
             cv_wrap { [ shift, $elem ] } $fn->();
         } @list;
-    } with {
+    } cv_with {
         map { $_->[1] } grep { $_->[0] } @_;
     };
 }
