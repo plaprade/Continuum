@@ -1,6 +1,9 @@
 = pod 
 
-=head1 CondVar::Util 
+=head2 CondVar-Util 
+
+B<! This is still work in progress. The code is likely to
+change !>
 
 L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
 is a great Perl event-loop library for doing asynchronous
@@ -30,10 +33,10 @@ can write this:
     use AnyEvent;
     use CondVar::Util;
 
-    my $cv = cv_and {
+    my $cv = cv_and(
         $db->get( 'elem1' ),
         $db->get( 'elem2' ),
-    };
+    );
 
     $cv->cb( sub {
         my ( $elem1, $elem2 ) = @_;
@@ -52,11 +55,11 @@ variables returns.
     use AnyEvent;
     use CondVar::Util;
 
-    my $cv = cv_or {
+    my $cv = cv_or(
         ping( 'mirror1' ),
         ping( 'mirror2' ),
         ping( 'mirror3' ),
-    };
+    );
 
     $cv->cb( sub {
         my $first_mirror = shift;

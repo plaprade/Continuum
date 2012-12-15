@@ -38,8 +38,8 @@ sub cv {
     $cv;
 }
 
-sub cv_and(&@) {
-    my @cvs = map { $_->() } @_;
+sub cv_and {
+    my @cvs = @_;
 
     my @result;
     my $cv = AnyEvent::condvar;
@@ -60,8 +60,8 @@ sub cv_and(&@) {
     $cv;
 }
 
-sub cv_or(&@) {
-    my @cvs = map { $_->() } @_;
+sub cv_or {
+    my @cvs = @_;
 
     my $done = 0;
     my $cv = AnyEvent::condvar;
@@ -116,7 +116,7 @@ sub cv_wrap(&$) {
 
 sub cv_map(&@) {
     my ( $fn, @list ) = @_;
-    cv_and { map { $fn->() } @list };
+    cv_and( map { $fn->() } @list );
 }
 
 sub cv_grep(&@) {

@@ -31,48 +31,26 @@ ok_cv(
 );
 
 ok_cv(
-    ( cv_and {
+    cv_and(
         cv(1),
         cv_timer( 0.2 => sub{2} ),
         cv(3),
         cv_timer( 0.1 => sub{4} ),
         cv(5),
-    } ),
+    ),
     [ 1, 2, 3, 4, 5 ],
     'cv_and returns an ordered list of all the condvar values'
 );
 
 ok_cv(
-    ( cv_and { cv(1) }
-        cv_with { cv_timer( 0.2 => sub{2} ), cv(3) }
-        cv_with { cv(4), cv(5) }
-        cv_with { cv_timer( 0.1 => sub{6} ), cv(7) }
-        cv_with { cv(8) } ),
-    [ 1, 2, 3, 4, 5, 6, 7, 8 ],
-    'cv_and works with many functions as arguments'
-);
-
-ok_cv(
-    ( cv_or {
+    cv_or(
         cv_timer( 0.4 => sub{1} ),
         cv_timer( 0.3 => sub{2} ),
         cv_timer( 0.2 => sub{3} ),
         cv_timer( 0.1 => sub{4} ),
-    } ),
+    ),
     [ 4 ],
     'cv_or returns the value of the first condvar to complete'
-);
-
-ok_cv(
-    ( cv_or {
-        cv_timer( 0.4 => sub{1} ),
-        cv_timer( 0.3 => sub{2} ),
-    } cv_with {
-        cv_timer( 0.2 => sub{3} ),
-        cv_timer( 0.1 => sub{4} ),
-    } ),
-    [ 4 ],
-    'cv_or works with many functions as arguments'
 );
 
 ok_cv(
