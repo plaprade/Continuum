@@ -214,6 +214,9 @@ parallel because they depend on data produced from a previous
 block.  C<cv_chain> is thus necessary to link the data
 dependencies between the blocks. 
 
+For convenience, you can use either C<cv_then> or C<cv_with>
+to add continuations in your chain.
+
 =head2 Map and Grep
 
 Hell, you will never see a documentation on functional
@@ -245,6 +248,73 @@ provides an excellent way to solve this problem by transforming
 the keys into CVs and waiting for all CVs to return. The CV
 produced by C<cv_map> will return an ordered list of mapped
 results.
+
+Similarily, we provide a C<cv_grep> function if you need to
+perform a grep where the filter is asynchronous:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_grep {
+        $db->exists( $_ );
+    } @keys;
+
+    # Block until the map results return
+    my @valid_keys = $cv->recv;
+
+    # Provide a callback to handle the map results
+    $cv->cb( sub {
+        my @valid_keys = $shift->recv;
+    });
+
+In the example above, we filter a list of keys based on wether
+they exist in our database or not. C<cv_map> and C<cv_grep>
+both take a function as their first argument that has to
+return a CV. If you look at the code, C<cv_grep> is written
+internally using C<cv_map>, and C<cv_map> is written
+internally using C<cv_and>.
+
+=head2 Wraps
+
+We provide you with a simple CV wrapper function called
+C<cv_wrap>. It basically applies a function to the result of a
+CV.
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_wrap {
+        shift * 2
+    } $db->get( 'account' );
+
+    # Block until we receive the doubled account balance
+    my $balance = $cv->recv;
+
+    # Provide a callback to listen to the account balance
+    $cv->cb( sub {
+        my $balance = shift->recv;
+    });
+
+=head2 Timers
+
+You can create a CV that returns based on a timer using
+C<cv_timer>. The value returned by the timer CV can be
+controlled by a function.
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_timer( 2 => sub {
+        return 'done';
+    });
+
+    # Block until the timer CV returns
+    my $value = $cv->recv;
+
+    # Provide a callback once the timer CV return
+    $cv->cb( sub {
+        my $value = shift->recv;
+    });
 
 =head2 Installation
 
