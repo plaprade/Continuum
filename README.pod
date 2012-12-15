@@ -22,11 +22,11 @@ module usefull.
 
 =head2 Terminology
 
-We will use the terms I<condition variable> and I<CV> 
+We will use the terms "condition variable" and "CV" 
 interchangeably. In both cases, we are refering to
-AnyEvent condition variables ( AnyEvent::condvar ).
+AnyEvent condition variables (AnyEvent::condvar).
 
-We will often talking about waiting for a CV to return. What
+We will often talk about "waiting for a CV to return". What
 we really mean is wait for the condition represented by the CV
 to become true. When this happens, the CV usually returns a
 value sent by the producer of the condition.
@@ -124,8 +124,8 @@ fastest mirrors respectively.
 
 It is not uncommon that asynchronous operations have data
 dependencies between them. CondVar-Util provides a simple
-interface to deal with data dependencies between CVs. Here's
-how you deal with it:
+interface to deal with data dependencies between CVs using
+C<cv_chain>:
 
     use AnyEvent;
     use CondVar::Util;
@@ -203,10 +203,10 @@ Here's how you would do that:
 
 In the above example we try to transfer 10 units from account2
 to account1 and we fail if account1 doesn't have enough funds.
-Returning a scalar or a list from a chain will return this
+Returning a scalar or an array from a chain will return this
 scalar or array through the CV of the chain. If the funds
-transfer succeeded, the CV will return the new balances of
-each account. Otherwise, it will return the old balances
+transfer succeeds, the CV will return the new balance of
+each account. Otherwise, it will return the old balance
 (unchanged) of both accounts.
 
 Note that the 3 different blocks in this chain can not run in
@@ -219,13 +219,13 @@ to add continuations in your chain.
 
 =head2 Map and Grep
 
-Hell, you will never see a documentation on functional
-programming without at least mentionning map and grep. We keep
-the perl terminologies for convenience in this library.
+It's hard to ignore the classics! Map and Grep are everywhere,
+even messing with your condition variables. We keep the perl
+terminologies for convenience in this library.
 
-Say you have a list of elements that you neep to map, but the
-required map operations is asynchronous. Well don't worry,
-C<cv_map> to the rescue! Consider the following example:
+Say you have a list of elements to map, but the required map
+operations is asynchronous. Well don't worry, here's C<cv_map>
+to the rescue! Consider the following example:
 
     use AnyEvent;
     use CondVar::Util;
@@ -295,6 +295,9 @@ CV.
         my $balance = shift->recv;
     });
 
+In this example, we wrap a CV with a second CV that doubles the
+value of the first CV when it returns.
+
 =head2 Timers
 
 You can create a CV that returns based on a timer using
@@ -325,7 +328,7 @@ controlled by a function.
 
 =head2 Dependencies
 
-    L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
+L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
 
 =head2 Copyright and license
 
@@ -343,7 +346,7 @@ PURPOSE.  See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public
 License along with this program.  If not, see
-<http://www.gnu.org/licenses/>
+L<http://www.gnu.org/licenses/>
 
 =cut
 
