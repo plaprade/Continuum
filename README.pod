@@ -6,29 +6,39 @@ B<! This is still work in progress. The code is likely to
 change !>
 
 L<AnyEvent|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
-is a great Perl event-loop library for doing asynchronous
+is a great Perl event-loop library for asynchronous
 programming.  It uses condition variables as a powerful
 primitive to control the flow, or the continuation, of an
-asynchronous program.
+asynchronous program. If you are not yet familiar with
+AnyEvent and condition variables, check out the L<AnyEvent
+documentation|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>.
 
-Check out the great L<AnyEvent
-documentation|http://search.cpan.org/dist/AnyEvent/lib/AnyEvent.pm>
-on condition variables.
+CondVar-Util provides tools for working with condition
+variables. It provides solutions for the most common problems
+you will likely encounter when working with condition
+variables. It should help you reduce the complexity of your
+code and make it easier to read. I hope you will find this
+module usefull.
 
-This module provides simple tools for manipulating condition
-variables.  It should help you reduce the amount of embedded
-callbacks in your code as well as make it easier to read. I
-hope you find it usefull.
+=head2 Terminology
+
+We will use the terms I<condition variable> and I<CV> 
+interchangeably. In both cases, we are refering to
+AnyEvent condition variables ( AnyEvent::condvar ).
+
+We will often talking about waiting for a CV to return. What
+we really mean is wait for the condition represented by the CV
+to become true. When this happens, the CV usually returns a
+value sent by the producer of the condition.
 
 =head2 How to use
 
-Most functions in this library take condition variables as
-input and return a condition variable. They essentially wrap
-condition variables together to produce desired functionality.
+All the functions in this library take CVs as input and
+produce a new CV. Essentially, they combine CVs together to
+produce new functionality.
 
-Here's a simple example using C<cv_and>. If you've got a
-database library C<$db> that returns condition variables, you
-can write this:
+Here is how you would use  C<cv_and>. If you've got a database
+library C<$db> that returns CVs, you can write this:
 
     use AnyEvent;
     use CondVar::Util;
@@ -38,19 +48,23 @@ can write this:
         $db->get( 'elem2' ),
     );
 
+    # Block until the result is available
+    my ( $elem1, $elem2 ) = $cv->recv;
+
+    # Provide a callback to handle the response
     $cv->cb( sub {
-        my ( $elem1, $elem2 ) = @_;
+        my ( $elem1, $elem2 ) = shift->recv;
     });
 
-Calling C<cv_and> will create a condition variable that will wait
-for all the database reads to complete. Additionally, the
-condition variable will return an ordered list of results.
-Functionally, this is an B<AND> condition as you require all
-input condition variables to return before you can continue.
+Calling C<cv_and> creates a CV that waits for all the database
+reads to complete ( in parallel ).  Additionally, the CV will
+return an ordered list containing all the database results.
+This functionality is equivalent to an B<AND> condition as we
+require B<ALL> database operations to complete before we
+return.
 
-Similarily, you can use C<cv_or> which will create a condition
-variable that returns as soon as any of the input condition
-variables returns.
+Similarily, you can guess the behavior of the C<cv_or>
+operation:
 
     use AnyEvent;
     use CondVar::Util;
@@ -61,12 +75,176 @@ variables returns.
         ping( 'mirror3' ),
     );
 
+    # Block until the result is available
+    my $first_mirror = $cv->recv;
+
+    # Provide a callback to handle the response
     $cv->cb( sub {
-        my $first_mirror = shift;
+        my $first_mirror = shift->recv;
     });
 
-Here we ping 3 different mirrors in parallel and wait for the
-first mirror to respond (the fastest mirror).
+C<cv_or> creates a CV that will return as soon as B<ANY> of
+it's input CVs returns.  Here we ping 3 different mirrors in
+parallel and wait for the first mirror to respond ( the
+fastest mirror ).
+
+=head2 Thinking with condition variables
+
+Once you've wrapped your head around the concept of condition
+variables, you can start combining them together to create
+powerfull new CVs. Consider this example:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_and(
+        cv_or(
+            get( file1 => mirror1 ),
+            get( file1 => mirror2 ),
+        ),
+        cv_or(
+            get( file2 => mirror1 ),
+            get( file2 => mirror2 ),
+        )
+    );
+
+    # Block until the result is available
+    my ( $file1, $file2 ) = $cv->recv;
+
+    # Provide a callback to handle the response
+    $cv->cb( sub {
+        my ( $file1, $file2 ) = shift->recv;
+    });
+
+Here we try to fetch two files ( file1 and file2 ) from two
+different mirrors in parallel. We accept the files from the
+fastest mirrors respectively.
+
+=head2 Data dependencies
+
+It is not uncommon that asynchronous operations have data
+dependencies between them. CondVar-Util provides a simple
+interface to deal with data dependencies between CVs. Here's
+how you deal with it:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_chain {
+        cv_and(
+            $db->get( 'account1' ),
+            $db->get( 'account2' ),
+        );
+    } cv_then {
+        my ( $account1, $account2 ) = @_;
+        cv_and(
+            $db->set( account1 => $account1 + $account2 ),
+            $db->set( account2 => 0 ),
+        );
+    };
+
+    # Wait for the account transfer to complete
+    $cv->recv;
+
+    # Provide a callback once the account transfer is complete
+    $cv->cb( sub {
+            
+    });
+
+This example queries the account balances of account1 and
+account2, then proceeds to move all the funds from account2 to
+account1. 
+
+C<cv_chain> is used to chain the output of a condition
+variable with the continuation of your program. You can use as
+many C<cv_then> as you want to chain CVs to continuations.
+This construct is powerful as it allows you to describe
+asynchronous code containing data dependencies in a sequencial
+way. It also keeps your code flat, which I believe is a good
+thing.
+
+C<cv_chain> produces a CV that returns the result of the
+last CV in your chain. You can also break the chain at any
+time by returning anything except an AnyEvent::CondVar object.
+Here's how you would do that:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_chain {
+        cv_and(
+            $db->get( 'account1' ),
+            $db->get( 'account2' ),
+        );
+    } cv_then {
+        my ( $account1, $account2 ) = @_;
+
+        return ( $account1, $account2 )
+            unless $account1 >= 10;
+
+        cv_and(
+            $db->set( account1 => $account1 - 10 ),
+            $db->set( account2 => $account2 + 10 ),
+        );
+    } cv_then {
+        cv_and(
+            $db->get( 'account1' ),
+            $db->get( 'account2' ),
+        );
+    };
+
+    # Wait for the funds transfer to complete
+    my ( $account1, $account2 ) = $cv->recv;
+
+    # Provide a callback once the funds transfer is complete
+    $cv->cb( sub {
+        my ( $account1, $account2 ) = $shift->recv;
+    });
+
+In the above example we try to transfer 10 units from account2
+to account1 and we fail if account1 doesn't have enough funds.
+Returning a scalar or a list from a chain will return this
+scalar or array through the CV of the chain. If the funds
+transfer succeeded, the CV will return the new balances of
+each account. Otherwise, it will return the old balances
+(unchanged) of both accounts.
+
+Note that the 3 different blocks in this chain can not run in
+parallel because they depend on data produced from a previous
+block.  C<cv_chain> is thus necessary to link the data
+dependencies between the blocks. 
+
+=head2 Map and Grep
+
+Hell, you will never see a documentation on functional
+programming without at least mentionning map and grep. We keep
+the perl terminologies for convenience in this library.
+
+Say you have a list of elements that you neep to map, but the
+required map operations is asynchronous. Well don't worry,
+C<cv_map> to the rescue! Consider the following example:
+
+    use AnyEvent;
+    use CondVar::Util;
+
+    my $cv = cv_map {
+        $db->get( $_ );
+    } @keys;
+
+    # Block until the map results return
+    my @mapped_keys = $cv->recv;
+
+    # Provide a callback to handle the map results
+    $cv->cb( sub {
+        my @mapped_keys = $shift->recv;
+    });
+
+In this case, we've got a list of keys that we would like
+to asynchronously map to their database values. C<cv_map>
+provides an excellent way to solve this problem by transforming
+the keys into CVs and waiting for all CVs to return. The CV
+produced by C<cv_map> will return an ordered list of mapped
+results.
 
 =head2 Installation
 
