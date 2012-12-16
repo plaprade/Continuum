@@ -356,11 +356,11 @@ value of the CV.
 
 =head2 Bugs
 
-Please report any bugs here:
+Please report any bugs in the projects bug tracker:
 
-L<github.com/ciphermonk/CondVar-Util/issues>
+L<http://github.com/ciphermonk/CondVar-Util/issues>
 
-You can also provide a fix by contributing to the project.
+You can also provide a fix by contributing to the project:
 
 =head2 Contributing
 
@@ -388,7 +388,7 @@ Open a pull request
 =head2 Supporting
 
 Like what you see? You can support the project by donating in
-L<Bitcoins|weusecoins.com> to:
+L<Bitcoins|http://www.weusecoins.com/> to:
 
 B<17YWBJUHaiLjZWaCyPwcV8CJDpfoFzc8Gi>
 
