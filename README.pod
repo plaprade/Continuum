@@ -23,7 +23,7 @@ module usefull.
 
 We will use the terms "condition variable" and "CV" 
 interchangeably. In both cases, we are refering to
-AnyEvent condition variables (L<AnyEvent::CondVar>).
+AnyEvent condition variables (L<AnyEvent::CondVar|AnyEvent>).
 
 We will often talk about "waiting for a CV to return". What
 we really mean is wait for the condition represented by the CV
@@ -212,18 +212,17 @@ keeps your code flat, which I believe is a good thing.
 
 C<cv_chain> produces a CV that returns the result of the last
 CV in your chain. You can also break out of the chain at any
-time by returning anything except an L<AnyEvent::CondVar>:
+time by returning anything except an
+L<AnyEvent::CondVar|AnyEvent>:
 
     use AnyEvent;
     use CondVar::Util;
 
     my $cv = cv_chain {
-
         cv_and(
             $db->get( 'account1' ),
             $db->get( 'account2' ),
         );
-
     } cv_then {
         my ( $account1, $account2 ) = @_;
 
@@ -234,14 +233,11 @@ time by returning anything except an L<AnyEvent::CondVar>:
             $db->set( account1 => $account1 - 10 ),
             $db->set( account2 => $account2 + 10 ),
         );
-
     } cv_then {
-
         cv_and(
             $db->get( 'account1' ),
             $db->get( 'account2' ),
         );
-
     };
 
     # Wait for the funds transfer to complete
@@ -270,7 +266,7 @@ C<cv_with> to add continuations to your chain.
 =head2 Map and Grep
 
 Say you have a list of elements to map, but the map operation is 
-asynchronous ( like fetching elements from a database ). 
+asynchronous ( like fetching elements from a database ): 
 
     use AnyEvent;
     use CondVar::Util;
@@ -358,20 +354,43 @@ You can build a CV that returns based on a timer:
 You can optionally provide a callback to specify the return
 value of the CV.
 
-=head2 Installation
+=head2 Bugs
 
-    perl Makefile.PL
-    make
-    make test
-    make install
+Please report any bugs here:
 
-=head2 Dependencies
+L<github.com/ciphermonk/CondVar-Util/issues>
+
+You can also provide a fix by contributing to the project.
+
+=head2 Contributing
+
+We're glad you want to contribute! It's simple:
 
 =over
 
-=item L<AnyEvent>
+=item * 
+Fork it
+
+=item *
+Create a branch C<git checkout -b my_branch>
+
+=item *
+Commit your changes C<git commit -am 'comments'>
+
+=item *
+Push the branch C<git push origin my_branch>
+
+=item *
+Open a pull request
 
 =back
+
+=head2 Supporting
+
+Like what you see? You can support the project by donating in
+L<Bitcoins|weusecoins.com> to:
+
+B<17YWBJUHaiLjZWaCyPwcV8CJDpfoFzc8Gi>
 
 =head2 Copyright and license
 
