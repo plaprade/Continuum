@@ -101,7 +101,7 @@ sub cv_chain(&@) {
 sub cv_then(&@) { @_ }
 sub cv_with(&@) { @_ }
 
-sub cv_wrap(&$) {
+sub cv_wrap(&@) {
     my ( $fn, $cv ) = @_;
 
     my $cv_wrap = AnyEvent::condvar;
