@@ -4,11 +4,11 @@ use strict;
 use warnings;
 
 use AnyEvent;
-
 require Exporter;
 
-our @ISA = qw( Exporter );
+use version; our $VERSION = version->declare("v0.0.1"); 
 
+our @ISA = qw( Exporter );
 our %EXPORT_TAGS = ( all => [ qw(
     cv
     cv_timer
@@ -20,12 +20,16 @@ our %EXPORT_TAGS = ( all => [ qw(
     cv_wrap
     cv_map
     cv_grep
-    cv_build
 ) ] );
-
 our @EXPORT_OK = @{ $EXPORT_TAGS{ all } }; 
 
-our $VERSION = '0.01';
+=pod
+
+=head1 NAME
+
+AnyEventX::CondVarUtil - Continuation framework for AnyEvent condition variables
+
+=cut
 
 sub is_condvar {
     my $val = shift;
@@ -130,10 +134,6 @@ sub cv_grep(&@) {
     } cv_with {
         map { $_->[1] } grep { $_->[0] } @_;
     };
-}
-
-sub cv_build {
-    
 }
 
 sub cv_timer {
