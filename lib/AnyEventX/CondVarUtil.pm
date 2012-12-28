@@ -1,4 +1,4 @@
-package CondVar::Util;
+package AnyEventX::CondVarUtil;
 
 use strict;
 use warnings;
@@ -20,6 +20,7 @@ our %EXPORT_TAGS = ( all => [ qw(
     cv_wrap
     cv_map
     cv_grep
+    cv_build
 ) ] );
 
 our @EXPORT_OK = @{ $EXPORT_TAGS{ all } }; 
@@ -131,6 +132,10 @@ sub cv_grep(&@) {
     };
 }
 
+sub cv_build {
+    
+}
+
 sub cv_timer {
     my ( $after, $cb ) = @_;
     my $cv = AnyEvent::condvar;
@@ -143,5 +148,6 @@ sub cv_timer {
     );
     $cv;
 }
+
 
 1;

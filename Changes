@@ -1,6 +1,6 @@
-Revision history for Perl extension CondVar::Util.
+Revision history for Perl extension AnyEventX::CondVarUtil
 
 0.01  Fri Dec 14 14:49:13 2012
 	- original version; created by h2xs 1.23 with options
-		-AXn CondVar::Util
+		-AXn AnyEventX::CondVarUtil
 

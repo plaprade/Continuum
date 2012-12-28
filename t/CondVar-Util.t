@@ -4,7 +4,7 @@ use warnings;
 use Test::More; 
 use Data::Dumper;
 
-BEGIN { use_ok( 'CondVar::Util', qw( :all ) ) };
+BEGIN { use_ok( 'AnyEventX::CondVarUtil', qw( :all ) ) };
 
 ok_cv(
     cv(2),

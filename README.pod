@@ -1,6 +1,6 @@
 = pod 
 
-=head2 CondVar-Util 
+=head2 AnyEventX::CondVarUtil
 
 B<! This module is work in progress. The code is likely to
 change !>
@@ -12,12 +12,12 @@ of an asynchronous program. If you are not yet familiar with
 AnyEvent and condition variables, check out the L<AnyEvent>
 documentation.
 
-CondVar-Util provides tools for working with condition
+AnyEventX-CondVarUtil provides tools for working with condition
 variables. It provides solutions for the most common problems
 you will likely encounter when working with condition
 variables. It should help you reduce the complexity of your
 code and make it easier to read. I hope you will find this
-module usefull.
+module useful.
 
 =head2 Terminology
 
@@ -33,7 +33,7 @@ value sent by the producer of the condition.
 =head2 Synopsis
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     # Wait for all CV conditions
     $cv = cv_and(
@@ -93,7 +93,7 @@ Say you're working with a database library that returns
 condition variables. You could do this: 
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_and(
         $db->get( 'elem1' ),
@@ -117,7 +117,7 @@ database operations to complete before we return.
 Similarily, you can guess the behavior of C<cv_or>:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_or(
         ping( 'mirror1' ),
@@ -141,10 +141,10 @@ for the first mirror to respond ( the fastest mirror ).
 
 Once you've wrapped your head around the concept of condition
 variables, you can start combining them together to create
-powerfull new CVs. Consider this example:
+powerful new CVs. Consider this example:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_and(
         cv_or(
@@ -172,11 +172,11 @@ fastest mirrors respectively.
 =head2 Data dependencies
 
 It is not uncommon for asynchronous operations to have data
-dependencies between them.  CondVar-Util provides a simple
+dependencies between them.  AnyEventX-CondVarUtil provides a simple
 interface for dealing with data dependencies:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_chain {
         cv_and(
@@ -216,7 +216,7 @@ time by returning anything except an
 L<AnyEvent::CondVar|AnyEvent>:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_chain {
         cv_and(
@@ -269,7 +269,7 @@ Say you have a list of elements to map, but the map operation is
 asynchronous ( like fetching elements from a database ): 
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_map {
         $db->get( $_ );
@@ -292,7 +292,7 @@ Similarily, we provide a C<cv_grep> function for performing
 asynchronous filtering on lists:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_grep {
         $db->exists( $_ );
@@ -318,7 +318,7 @@ Sometimes you need to build a CV that performs a
 transformation on the result of another CV:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_wrap {
         shift * 2
@@ -337,7 +337,7 @@ transformation on the result of another CV:
 You can build a CV that returns based on a timer:
 
     use AnyEvent;
-    use CondVar::Util;
+    use AnyEventX::CondVarUtil;
 
     my $cv = cv_timer( 2 => sub {
         return 'boom';
@@ -358,7 +358,7 @@ value of the CV.
 
 Please report any bugs in the projects bug tracker:
 
-L<http://github.com/ciphermonk/CondVar-Util/issues>
+L<http://github.com/ciphermonk/AnyEventX-CondVarUtil/issues>
 
 You can also provide a fix by contributing to the project:
 
