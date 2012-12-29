@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use AnyEvent;
+use Scalar::Util qw( blessed );
 require Exporter;
 
 use version; our $VERSION = version->declare("v0.0.1"); 
@@ -20,6 +21,8 @@ our %EXPORT_TAGS = ( all => [ qw(
     cv_wrap
     cv_map
     cv_grep
+    cv_build
+    cv_result
 ) ] );
 our @EXPORT_OK = @{ $EXPORT_TAGS{ all } }; 
 
@@ -30,11 +33,6 @@ our @EXPORT_OK = @{ $EXPORT_TAGS{ all } };
 AnyEventX::CondVarUtil - Continuation framework for AnyEvent condition variables
 
 =cut
-
-sub is_condvar {
-    my $val = shift;
-    defined $val && ref( $val ) eq 'AnyEvent::CondVar';
-}
 
 sub cv {
     return shift if is_condvar( @_ );
@@ -89,6 +87,8 @@ sub cv_chain(&@) {
     foreach my $fn ( reverse @fns ) {
         my $next = $fp; $fp = sub {
             my ( $x, @xs ) = $fn->( @_ );
+            is_result( $x ) ?
+                $cv->send(( $x->value )) :
             is_condvar( $x ) ?
                 $x->cb( sub {
                     defined $next ?
@@ -136,6 +136,30 @@ sub cv_grep(&@) {
     };
 }
 
+sub cv_build(&@) {
+    my $cv = AnyEvent->condvar;
+    my $fp = undef;
+    foreach my $f ( reverse @_ ) {
+        my $next = $fp; $fp = sub {
+            if( defined $next ){
+                my $res = $f->( $next, @_ );
+                $cv->send(( $res->value ))
+                    if is_result( $res );
+            } else {
+                my @res = $f->( @_ );
+                $cv->send( is_result( @res ) ? 
+                    @res[0]->value : @res );
+            }
+        };
+    }
+    $fp->();
+    $cv;
+}
+
+sub cv_result {
+    AnyEventX::CondVarUtil::Return->new( @_ );
+}
+
 sub cv_timer {
     my ( $after, $cb ) = @_;
     my $cv = AnyEvent::condvar;
@@ -149,5 +173,31 @@ sub cv_timer {
     $cv;
 }
 
+sub is_condvar {
+    my $val = shift;
+    defined $val && ref( $val ) eq 'AnyEvent::CondVar';
+}
+
+sub is_result {
+    my $val = shift;
+    blessed( $val ) && $val->isa( 'AnyEventX::CondVarUtil::Return' );
+}
+
+package AnyEventX::CondVarUtil::Return;
+
+sub new {
+    my $class = shift;
+    my $self = {
+        _value => [ @_ ],
+    };
+    bless $self, $class;
+}
+
+sub value {
+    my $self = shift;
+    wantarray ? 
+        @{ $self->{ _value } } : 
+        $self->{ _value }->[0];
+}
 
 1;

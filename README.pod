@@ -369,7 +369,7 @@ We're glad you want to contribute! It's simple:
 =over
 
 =item * 
-Fork it
+Fork the project
 
 =item *
 Create a branch C<git checkout -b my_branch>

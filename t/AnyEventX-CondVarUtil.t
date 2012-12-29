@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 
+use AnyEvent;
 use Test::More; 
 use Data::Dumper;
 
@@ -66,17 +67,28 @@ ok_cv(
     'cv_chain chains the result of a condvar with the next function'
 );
 
+ok_cv(
+    (cv_chain {
+        cv_timer( 0.1 => sub{ 3 } );
+    } cv_with {
+        cv_result( shift, 2, 1 );
+    } cv_with {
+        cv_timer( 0.1 => sub{ ( 1, 2, 3 ) } );
+    }),
+    [ 3, 2, 1 ],
+    'cv_chain returns from the chain when cv_result is encountered'
+);
 
 ok_cv(
     (cv_chain {
         cv_timer( 0.1 => sub{ 3 } );
     } cv_with {
-        return ( shift, 2, 1 );
+        ( shift, 2, 1 );
     } cv_with {
         cv_timer( 0.1 => sub{ ( 1, 2, 3 ) } );
     }),
     [ 3, 2, 1 ],
-    'cv_chain returns from the chain if no condvar is seen'
+    'cv_chain returns from the chain when no condvar is returned'
 );
 
 ok_cv(
@@ -110,6 +122,47 @@ ok_cv(
     } ( 1, undef, 2, undef ) ),
     [ undef, undef ],
     'cv_grep must work with undef filters'
+);
+
+ok_cv(
+    ( cv_build {
+        my $next = shift;
+        my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
+            undef $w;
+            $next->( 3 ); 
+        });
+    } cv_then {
+        my ( $next, @args ) = @_; 
+        my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
+            undef $w;
+            $next->( @args, 2 );
+        });
+    } cv_then {
+        ( @_, 1 );
+    } ),
+    [ 3, 2, 1 ],
+    'cv_build creates a new condvar from a set of callbacks',
+);
+
+ok_cv(
+    ( cv_build {
+        my $next = shift;
+        my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
+            undef $w;
+            $next->( 3 ); 
+        });
+    } cv_then {
+        my ( $next, @args ) = @_; 
+        my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
+            undef $w;
+            $next->( @args, 2 );
+        });
+        cv_result( 5, 6, 7 );
+    } cv_then {
+        ( @_, 1 );
+    } ),
+    [ 5, 6, 7 ],
+    'cv_build breaks the chain if cv_result is encountered',
 );
 
 done_testing();
