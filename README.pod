@@ -2,33 +2,30 @@
 
 =head2 AnyEventX::CondVarUtil
 
-B<! This module is work in progress. The code is likely to
-change !>
+B<! This module is work in progress. The code is likely to change !>
 
-L<AnyEvent> is a great Perl event-loop library for
-asynchronous programming.  It uses condition variables as a
-powerful primitive to control the flow, or the continuation,
-of an asynchronous program. If you are not yet familiar with
-AnyEvent and condition variables, check out the L<AnyEvent>
-documentation.
+L<AnyEvent> is a great Perl event-loop library for asynchronous
+programming.  It uses condition variables as a powerful primitive to
+control the flow, or the continuation, of an asynchronous program. If
+you are not yet familiar with AnyEvent and condition variables, check
+out the L<AnyEvent> documentation.
 
 AnyEventX-CondVarUtil provides tools for working with condition
-variables. It provides solutions for the most common problems
-you will likely encounter when working with condition
-variables. It should help you reduce the complexity of your
-code and make it easier to read. I hope you will find this
-module useful.
+variables. It provides solutions for the most common problems you will
+likely encounter when working with condition variables. It should help
+you reduce the complexity of your code and make it easier to read. I
+hope you will find this module useful.
 
 =head2 Terminology
 
-We will use the terms "condition variable" and "CV" 
-interchangeably. In both cases, we are refering to
-AnyEvent condition variables (L<AnyEvent::CondVar|AnyEvent>).
+We will use the terms "condition variable" and "CV" interchangeably.
+In both cases, we are refering to AnyEvent condition variables
+(L<AnyEvent::CondVar|AnyEvent>).
 
-We will often talk about "waiting for a CV to return". What
-we really mean is wait for the condition represented by the CV
-to become true. When this happens, the CV usually returns a
-value sent by the producer of the condition.
+We will often talk about "waiting for a CV to return". What we really
+mean is wait for the condition represented by the CV to become true.
+When this happens, the CV usually returns a value sent by the producer
+of the condition.
 
 =head2 Synopsis
 
@@ -75,6 +72,14 @@ value sent by the producer of the condition.
         return 'boom';
     });
 
+    # Build CV from callback-style API
+    $cv = cv_build {
+        my $next = shift;
+        $db->get( $key => $next );
+    } cv_then {
+        my $value = shift;
+    };
+
     # Block until CV returns
     @results = $cv->recv;
 
@@ -85,14 +90,13 @@ value sent by the producer of the condition.
 
 =head2 How to use
 
-All the functions in this library take CVs as input and
-produce a new CV. Essentially, they combine CVs together to
-produce new functionality.
+All the functions in this library take CVs as input and produce a new
+CV. Essentially, they combine CVs together to produce new
+functionality.
 
-Say you're working with a database library that returns
-condition variables. You could do this: 
+Say you're working with a database library that returns condition
+variables. You could do this: 
 
-    use AnyEvent;
     use AnyEventX::CondVarUtil;
 
     my $cv = cv_and(
@@ -109,44 +113,30 @@ condition variables. You could do this:
     });
 
 C<cv_and> builds a CV that waits for all the database calls to
-complete ( in parallel ).  Additionally, the CV will return an
-ordered list of database results.  This functionality is
-equivalent to an B<AND> condition as we require all
-database operations to complete before we return.
+complete ( in parallel ).  Additionally, the CV will return an ordered
+list of database results.  This functionality is equivalent to an
+B<AND> condition as we require all database operations to complete
+before we return.
 
 Similarily, you can guess the behavior of C<cv_or>:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_or(
+    cv_or(
         ping( 'mirror1' ),
         ping( 'mirror2' ),
         ping( 'mirror3' ),
     );
 
-    # Block until the result is available
-    my $first_mirror = $cv->recv;
-
-    # Provide a callback to handle the response
-    $cv->cb( sub {
-        my $first_mirror = shift->recv;
-    });
-
-C<cv_or> builds a CV that waits for any of the input CVs to
-return. Here we ping 3 different mirrors in parallel and wait
-for the first mirror to respond ( the fastest mirror ).
+C<cv_or> builds a CV that waits for any of the input CVs to return.
+Here we ping 3 different mirrors in parallel and wait for the first
+mirror to respond ( the fastest mirror ).
 
 =head2 Thinking with condition variables
 
 Once you've wrapped your head around the concept of condition
-variables, you can start combining them together to create
-powerful new CVs. Consider this example:
+variables, you can start combining them together to create powerful
+new CVs. Consider this example:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_and(
+    cv_and(
         cv_or(
             fetch( file1 => mirror1 ),
             fetch( file1 => mirror2 ),
@@ -157,17 +147,9 @@ powerful new CVs. Consider this example:
         )
     );
 
-    # Block until the result is available
-    my ( $file1, $file2 ) = $cv->recv;
-
-    # Provide a callback to handle the response
-    $cv->cb( sub {
-        my ( $file1, $file2 ) = shift->recv;
-    });
-
-Here we try to fetch two files ( file1 and file2 ) from two
-different mirrors in parallel. We accept the files from the
-fastest mirrors respectively.
+Here we try to fetch two files ( file1 and file2 ) from two different
+mirrors in parallel. We accept the files from the fastest mirrors
+respectively.
 
 =head2 Data dependencies
 
@@ -175,10 +157,7 @@ It is not uncommon for asynchronous operations to have data
 dependencies between them.  AnyEventX-CondVarUtil provides a simple
 interface for dealing with data dependencies:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_chain {
+    cv_chain {
         cv_and(
             $db->get( 'account1' ),
             $db->get( 'account2' ),
@@ -191,34 +170,23 @@ interface for dealing with data dependencies:
         );
     };
 
-    # Wait for the account transfer to complete
-    $cv->recv;
+In this example, we first query the balances of two accounts and then
+proceed to move all the funds from one account to the other.
 
-    # Provide a callback once the account transfer is complete
-    $cv->cb( sub {
-            
-    });
+C<cv_chain> is used to link the output of a condition variable with
+the continuation of your program. You can use as many C<cv_then> as
+you want to chain CVs to continuations.  This construct is powerful as
+it allows you to describe asynchronous code with data dependencies
+sequentially. It also keeps your code flat, which I believe is a good
+thing.
 
-In this example, we first query the balances of two accounts
-and then proceed to move all the funds from one account to the
-other.
+C<cv_chain> produces a CV that returns the result of the last CV in
+your chain. You can also break out of the chain at any time by
+returning with C<cv_result> or with any value different from
+L<AnyEvent::CondVar|AnyEvent>. We recommend breaking a chain with
+C<cv_result> for clarity if you need to do that.
 
-C<cv_chain> is used to link the output of a condition variable
-with the continuation of your program. You can use as many
-C<cv_then> as you want to chain CVs to continuations.  This
-construct is powerful as it allows you to describe
-asynchronous code with data dependencies sequentially. It also
-keeps your code flat, which I believe is a good thing.
-
-C<cv_chain> produces a CV that returns the result of the last
-CV in your chain. You can also break out of the chain at any
-time by returning anything except an
-L<AnyEvent::CondVar|AnyEvent>:
-
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_chain {
+    cv_chain {
         cv_and(
             $db->get( 'account1' ),
             $db->get( 'account2' ),
@@ -226,7 +194,7 @@ L<AnyEvent::CondVar|AnyEvent>:
     } cv_then {
         my ( $account1, $account2 ) = @_;
 
-        return ( $account1, $account2 )
+        return cv_result( $account1, $account2 )
             unless $account1 >= 10;
 
         cv_and(
@@ -240,119 +208,94 @@ L<AnyEvent::CondVar|AnyEvent>:
         );
     };
 
-    # Wait for the funds transfer to complete
-    my ( $account1, $account2 ) = $cv->recv;
-
-    # Provide a callback once the funds transfer is complete
-    $cv->cb( sub {
-        my ( $account1, $account2 ) = $shift->recv;
-    });
-
-In the example above, we try to transfer 10 units from
-account2 to account1 and fail if account1 doesn't have enough
-funds.  Returning a scalar, array or hash from a chain will
-return this value from the chain's CV. If the fund transfer
-succeeds, the CV will return the new balance of each account.
+In the example above, we try to transfer 10 units from account2 to
+account1 and fail if account1 doesn't have enough funds. If the fund
+transfer succeeds, the CV will return the new balance of each account.
 Otherwise, it will return the old balances.
 
-Note that the 3 blocks in this chain can not run in parallel
-as they depend on data produced by a previous block.
-C<cv_chain> is necessary to link the data dependencies between
-the blocks. 
+Note that the 3 blocks in this chain can not run in parallel as they
+depend on data produced by a previous block.  C<cv_chain> is necessary
+to link the data dependencies between the blocks. 
 
 For convenience or clarity, you can use either C<cv_then> or
 C<cv_with> to add continuations to your chain.
 
 =head2 Map and Grep
 
-Say you have a list of elements to map, but the map operation is 
+Say you have a list of elements to map, but the map operation is
 asynchronous ( like fetching elements from a database ): 
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_map {
+    cv_map {
         $db->get( $_ );
     } @keys;
 
-    # Block until the map results return
-    my @mapped_keys = $cv->recv;
-
-    # Provide a callback to handle the map results
-    $cv->cb( sub {
-        my @mapped_keys = $shift->recv;
-    });
-
-C<cv_map> will run all the database operations in parallel and
-wait for all of them to complete ( like C<cv_and> ). It builds
-a CV that returns an ordered list of all the results. The map
-function maps your input elements to CVs.
+C<cv_map> will run all the database operations in parallel and wait
+for all of them to complete ( like C<cv_and> ). It builds a CV that
+returns an ordered list of all the results. The map function maps your
+input elements to CVs.
 
 Similarily, we provide a C<cv_grep> function for performing
 asynchronous filtering on lists:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_grep {
+    cv_grep {
         $db->exists( $_ );
     } @keys;
 
-    # Block until the map results return
-    my @valid_keys = $cv->recv;
-
-    # Provide a callback to handle the map results
-    $cv->cb( sub {
-        my @valid_keys = $shift->recv;
-    });
-
-C<cv_grep> will run all database queries in parallel and wait
-for all of them to complete. It builds a CV that returns an
-ordered list of elements for which the filter operation
-returned true. The filter functions transforms your input
-elements to CVs.
+C<cv_grep> will run all database queries in parallel and wait for all
+of them to complete. It builds a CV that returns an ordered list of
+elements for which the filter operation returned true. The filter
+functions transforms your input elements to CVs.
 
 =head2 Wrapping
 
-Sometimes you need to build a CV that performs a
-transformation on the result of another CV:
+Sometimes you need to build a CV that performs a transformation on the
+result of another CV:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
+    cv_wrap {
+        map { $_->id => $_->name } @_;
+    } $db->get( 'all_clients' );
 
-    my $cv = cv_wrap {
-        shift * 2
-    } $db->get( 'shoe_pairs' );
+C<cv_wrap> simply applies your function to the value of your initial CV,
+and returns that from a new CV.
 
-    # Block until we receive the doubled account balance
-    my $shoe_count = $cv->recv;
+=head2 Building
 
-    # Provide a callback to listen to the account balance
-    $cv->cb( sub {
-        my $shoe_count = shift->recv;
-    });
+Most of the time, you have access to an API that supports callbacks
+such as C<Mojo::Redis> but doesn't support CVs directly.  C<cv_build>
+makes it easy to build CVs using callback-style APIs.
+
+    cv_build {
+        my $next = shift;
+        $redis->hget( $key => $next );
+    } cv_then {
+        my ( $next, $redis, $value ) = @_;
+        $value += 10;
+        $redis->hset( $key => $value => sub {
+            $next->( $value ); 
+        });
+    } cv_then {
+        my $value = shift; 
+        return $value;
+    };
+
+C<cv_build> creates a new CV that returns the value of your last
+function ( in this case C<$value> ). If you want to break from your
+callback chain early, you need to use C<cv_result> ( see the
+C<cv_chain> documentation above ). Every C<cv_then> function receives
+the next function reference as it's first argument, followed by any
+parameters passed from the last function call. It's your job to call
+the next function when appropriate.
 
 =head2 Timers
 
 You can build a CV that returns based on a timer:
 
-    use AnyEvent;
-    use AnyEventX::CondVarUtil;
-
-    my $cv = cv_timer( 2 => sub {
+    cv_timer( 2 => sub {
         return 'boom';
     });
 
-    # Block until the timer CV returns
-    my $value = $cv->recv;
-
-    # Provide a callback once the timer CV return
-    $cv->cb( sub {
-        my $value = shift->recv;
-    });
-
-You can optionally provide a callback to specify the return
-value of the CV.
+You can optionally provide a callback to specify the return value of
+the CV. 
 
 =head2 Bugs
 
@@ -396,19 +339,18 @@ B<17YWBJUHaiLjZWaCyPwcV8CJDpfoFzc8Gi>
 
 Copyright (C) 2012 ciphermonk
 
-This program is free software: you can redistribute it and/or
-modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation, either version 3 of
-the License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
 
-This program is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE.  See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public
-License along with this program.  If not, see
-L<http://www.gnu.org/licenses/>
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<http://www.gnu.org/licenses/>
 
 =cut
 
