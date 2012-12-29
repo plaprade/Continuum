@@ -11,7 +11,6 @@ use version; our $VERSION = version->declare("v0.0.1");
 
 our @ISA = qw( Exporter );
 our %EXPORT_TAGS = ( all => [ qw(
-    cv
     cv_timer
     cv_then
     cv_with
@@ -33,13 +32,6 @@ our @EXPORT_OK = @{ $EXPORT_TAGS{ all } };
 AnyEventX::CondVarUtil - Continuation framework for AnyEvent condition variables
 
 =cut
-
-sub cv {
-    return shift if is_condvar( @_ );
-    my $cv = AnyEvent::condvar;
-    $cv->send( @_ );
-    $cv;
-}
 
 sub cv_and {
     my @cvs = @_;

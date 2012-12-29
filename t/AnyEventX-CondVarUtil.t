@@ -8,36 +8,30 @@ use Data::Dumper;
 BEGIN { use_ok( 'AnyEventX::CondVarUtil', qw( :all ) ) };
 
 ok_cv(
-    cv(2),
+    cv_build { 2 },
     [ 2 ],
-    'cv creates a condvar when passed a scalar'
+    'cv_build creates a condvar when passed a scalar'
 );
 
 ok_cv(
-    cv( 1, 2, 3 ),
+    cv_build { 1, 2, 3 },
     [ 1, 2, 3 ],
-    'cv creates a condvar that returns a list of all its arguments'
+    'cv_build creates a condvar that returns a list of all its arguments'
 );
 
 ok_cv(
-    cv( cv(2) ),
-    [ 2 ],
-    'cv returns its argument if its a condvar'
-);
-
-ok_cv(
-    cv_timer( 0.1 => sub{2} ),
+    cv_timer( 0.1 => sub{ 2 } ),
     [ 2 ],
     'cv_timer evalutes its callback and returns it'
 );
 
 ok_cv(
     cv_and(
-        cv(1),
-        cv_timer( 0.2 => sub{2} ),
-        cv(3),
-        cv_timer( 0.1 => sub{4} ),
-        cv(5),
+        cv_build { 1 },
+        cv_timer( 0.2 => sub{ 2 } ),
+        cv_build { 3 },
+        cv_timer( 0.1 => sub{ 4 } ),
+        cv_build { 5 },
     ),
     [ 1, 2, 3, 4, 5 ],
     'cv_and returns an ordered list of all the condvar values'
@@ -58,7 +52,8 @@ ok_cv(
     (cv_chain {
         cv_timer( 0.1 => sub{ 1 } );
     } cv_with {
-        cv( @_, 2 );
+        my @args = @_;
+        cv_build { @args, 2 };
     } cv_with {
         my @args = @_;
         cv_timer( 0.1 => sub{ ( @args, 3 ) } );
@@ -92,7 +87,7 @@ ok_cv(
 );
 
 ok_cv(
-    ( cv_wrap { ( @_, 3 ) } cv( 1, 2 ) ),
+    ( cv_wrap { ( @_, 3 ) } cv_build { 1, 2 } ),
     [ 1, 2, 3 ],
     'cv_wrap maps the result of a condvar into another one'
 );
