@@ -37,7 +37,7 @@ sub cv_and {
     my @cvs = @_;
 
     my @result;
-    my $cv = AnyEvent::condvar;
+    my $cv = AnyEvent->condvar;
     
     $cv->begin( sub {
         $cv->send( map{ @$_ } @result ); 
@@ -59,7 +59,7 @@ sub cv_or {
     my @cvs = @_;
 
     my $done = 0;
-    my $cv = AnyEvent::condvar;
+    my $cv = AnyEvent->condvar;
     
     $_->cb( sub {
         return if $done;
@@ -101,7 +101,7 @@ sub cv_with(&@) { @_ }
 sub cv_wrap(&@) {
     my ( $fn, $cv ) = @_;
 
-    my $cv_wrap = AnyEvent::condvar;
+    my $cv_wrap = AnyEvent->condvar;
 
     $cv->cb( sub {
         $cv_wrap->send( 
@@ -149,12 +149,12 @@ sub cv_build(&@) {
 }
 
 sub cv_result {
-    AnyEventX::CondVarUtil::Return->new( @_ );
+    AnyEventX::CondVarUtil::Result->new( @_ );
 }
 
 sub cv_timer {
     my ( $after, $cb ) = @_;
-    my $cv = AnyEvent::condvar;
+    my $cv = AnyEvent->condvar;
     my $w; $w = AnyEvent->timer(
         after => $after,
         cb => sub {
@@ -172,10 +172,10 @@ sub is_condvar {
 
 sub is_result {
     my $val = shift;
-    blessed( $val ) && $val->isa( 'AnyEventX::CondVarUtil::Return' );
+    blessed( $val ) && $val->isa( 'AnyEventX::CondVarUtil::Result' );
 }
 
-package AnyEventX::CondVarUtil::Return;
+package AnyEventX::CondVarUtil::Result;
 
 sub new {
     my $class = shift;
