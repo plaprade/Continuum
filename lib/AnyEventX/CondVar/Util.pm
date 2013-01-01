@@ -1,14 +1,11 @@
-package AnyEventX::Util;
+package AnyEventX::CondVar::Util;
 
 use strict;
 use warnings;
 
-use AnyEvent;
 use Scalar::Util qw( blessed );
-use Carp;
-require Exporter;
 
-use version; our $VERSION = version->declare("v0.0.1"); 
+require Exporter;
 
 our @ISA = qw( Exporter );
 our %EXPORT_TAGS = ( all => [ qw(
@@ -44,7 +41,7 @@ sub cv_result {
 
 sub is_result {
     my $val = shift;
-    blessed( $val ) && $val->isa( 'AnyEventX::Util::Result' );
+    blessed( $val ) && $val->isa( 'AnyEventX::CondVar::Result' );
 }
 
 sub is_cv {
@@ -52,7 +49,7 @@ sub is_cv {
     blessed( $val ) && $val->isa( 'AnyEventX::CondVar' );
 }
 
-package AnyEventX::Util::Result;
+package AnyEventX::CondVar::Result;
 
 sub new {
     my $class = shift;

@@ -6,7 +6,6 @@ use Test::More;
 use Data::Dumper;
 
 BEGIN { use_ok( 'AnyEventX::CondVar', qw( :all ) ) };
-BEGIN { use_ok( 'AnyEventX::Util', qw( :all ) ) };
 
 run_all( 0, 0 );
 run_all( 0, 1 );
@@ -62,17 +61,7 @@ sub run_all {
 
 }
 
-is_deeply(
-    [ cv( 4, 2, 3 )->first->recv ],
-    [ 4 ],
-    'First'
-);
-
-is_deeply(
-    [ cv( 4, 2, 3 )->last->recv ],
-    [ 3 ],
-    'First'
-);
+### LIST OPERATORS ###
 
 is_deeply(
     [ cv(2)->cons( cv(3) )->cons( cv(4) )->recv ],
@@ -81,75 +70,27 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv(2)->cons( cv(3) )->wait( 0.1 )->cons( cv(4) )->recv ],
-    [ 2, 3, 4 ],
-    'Wait',
-);
-
-is_deeply(
-    [ ( cv(2) == 2 )->and( sub { 3 } )->recv ],
-    [ 3 ],
-    'And true',
-);
-
-is_deeply(
-    [ ( cv(2) < 2 )->and( sub { 3 } )->recv ],
-    [ '' ],
-    'And false',
-);
-
-is_deeply(
-    [ ( cv(2) == 2 )->or( sub { 3 } )->recv ],
-    [ 1 ],
-    'Or true',
-);
-
-is_deeply(
-    [ ( cv(2) < 2 )->or( sub { 3 } )->recv ],
-    [ 3 ],
-    'Or false',
-);
-
-is_deeply(
-    [ cv( 1, 4, 2, 1, 3, 2, 1 )->unique( sub{ $_ } )->sort->recv ],
+    [ cv( 1, 2, 3 )->push( cv(4) )->recv ],
     [ 1, 2, 3, 4 ],
-    'Unique & Sort',
+    'Push',
 );
 
 is_deeply(
-    [ cv( 1, 2, 3, 4 )->map( sub { $_ * 2 } )->recv ],
-    [ 2, 4, 6, 8 ],
-    'Map'
+    [ cv( 1, 2, 3, 4 )->pop->recv ],
+    [ 1, 2, 3 ],
+    'Pop',
 );
 
 is_deeply(
-    [ cv( 1, 2, 3, 4 )->grep( sub { $_ % 2 } )->recv ],
-    [ 1, 3 ],
-    'Grep'
+    [ cv( 2, 3, 4 )->unshift(1)->recv ],
+    [ 1, 2, 3, 4 ],
+    'Unshift',
 );
 
 is_deeply(
-    [ cv(1)->wait(0.1)->any( cv(2) )->recv ],
-    [ 2 ],
-    'Any 1'
-);
-
-is_deeply(
-    [ cv(1)->any( cv(2)->wait(0.1) )->recv ],
-    [ 1 ],
-    'Any 2'
-);
-
-is_deeply(
-    [ cv( 1, 2, 3 )->sum->recv ],
-    [ 6 ],
-    'Sum'
-);
-
-is_deeply(
-    [ cv( 2, 3, 4 )->mul->recv ],
-    [ 24 ],
-    'Mul'
+    [ cv( 1, 2, 3, 4 )->shift->recv ],
+    [ 2, 3, 4 ],
+    'Shift',
 );
 
 is_deeply(
@@ -179,9 +120,97 @@ is_deeply(
 );
 
 is_deeply(
+    [ cv( 4, 2, 3 )->first->recv ],
+    [ 4 ],
+    'First'
+);
+
+is_deeply(
+    [ cv( 4, 2, 3 )->last->recv ],
+    [ 3 ],
+    'Last'
+);
+
+is_deeply(
+    [ cv( 1, 4, 2, 1, 3, 2, 1 )->unique( sub{ $_ } )->sort->recv ],
+    [ 1, 2, 3, 4 ],
+    'Unique & Sort',
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->map( sub { $_ * 2 } )->recv ],
+    [ 2, 4, 6, 8 ],
+    'Map'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->grep( sub { $_ % 2 } )->recv ],
+    [ 1, 3 ],
+    'Grep'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3 )->sum->recv ],
+    [ 6 ],
+    'Sum'
+);
+
+is_deeply(
+    [ cv( 2, 3, 4 )->mul->recv ],
+    [ 24 ],
+    'Mul'
+);
+
+is_deeply(
     [ cv( [ 1, 2, 3 ], 4, { 5 => 6 } )->deref->recv ],
     [ 1, 2, 3, 4, 5, 6 ],
     'Deref',
+);
+
+### BOOLEAN OPERATORS ###
+
+is_deeply(
+    [ ( cv(2) == 2 )->and( sub { 3 } )->recv ],
+    [ 3 ],
+    'And true',
+);
+
+is_deeply(
+    [ ( cv(2) < 2 )->and( sub { 3 } )->recv ],
+    [ '' ],
+    'And false',
+);
+
+is_deeply(
+    [ ( cv(2) == 2 )->or( sub { 3 } )->recv ],
+    [ 1 ],
+    'Or true',
+);
+
+is_deeply(
+    [ ( cv(2) < 2 )->or( sub { 3 } )->recv ],
+    [ 3 ],
+    'Or false',
+);
+
+### MISC OPERATORS ###
+
+is_deeply(
+    [ cv(1)->wait(0.1)->any( cv(2) )->recv ],
+    [ 2 ],
+    'Any 1'
+);
+
+is_deeply(
+    [ cv(1)->any( cv(2)->wait(0.1) )->recv ],
+    [ 1 ],
+    'Any 2'
+);
+
+is_deeply(
+    [ cv(2)->cons( cv(3) )->wait( 0.1 )->cons( cv(4) )->recv ],
+    [ 2, 3, 4 ],
+    'Wait',
 );
 
 done_testing();

@@ -1,6 +1,8 @@
 = pod 
 
-=head2 AnyEventX::CondVarUtil
+=head2 AnyEventX-CondVar
+
+B<! This whole documentation needs to be re-written !>
 
 B<! This module is work in progress. The code is likely to change !>
 
@@ -10,7 +12,7 @@ control the flow, or the continuation, of an asynchronous program. If
 you are not yet familiar with AnyEvent and condition variables, check
 out the L<AnyEvent> documentation.
 
-AnyEventX-CondVarUtil provides tools for working with condition
+AnyEventX-CondVar provides tools for working with condition
 variables. It provides solutions for the most common problems you will
 likely encounter when working with condition variables. It should help
 you reduce the complexity of your code and make it easier to read. I
@@ -30,7 +32,7 @@ of the condition.
 =head2 Synopsis
 
     use AnyEvent;
-    use AnyEventX::CondVarUtil;
+    use AnyEventX::CondVar;
 
     # Wait for all CV conditions
     $cv = cv_and(
@@ -97,7 +99,7 @@ functionality.
 Say you're working with a database library that returns condition
 variables. You could do this: 
 
-    use AnyEventX::CondVarUtil;
+    use AnyEventX::CondVar;
 
     my $cv = cv_and(
         $db->get( 'elem1' ),
@@ -154,7 +156,7 @@ respectively.
 =head2 Data dependencies
 
 It is not uncommon for asynchronous operations to have data
-dependencies between them.  AnyEventX-CondVarUtil provides a simple
+dependencies between them.  AnyEventX-CondVar provides a simple
 interface for dealing with data dependencies:
 
     cv_chain {
@@ -301,7 +303,7 @@ the CV.
 
 Please report any bugs in the projects bug tracker:
 
-L<http://github.com/ciphermonk/AnyEventX-CondVarUtil/issues>
+L<http://github.com/ciphermonk/AnyEventX-CondVar/issues>
 
 You can also provide a fix by contributing to the project:
 

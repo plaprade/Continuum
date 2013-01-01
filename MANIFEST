@@ -3,5 +3,6 @@ Makefile.PL
 MANIFEST
 README.pod
 LICENSE
-t/AnyEventX-CondVarUtil.t
-lib/AnyEventX/CondVarUtil.pm
+t/AnyEventX-CondVar.t
+lib/AnyEventX/CondVar.pm
+lib/AnyEventX/CondVar/Util.pm

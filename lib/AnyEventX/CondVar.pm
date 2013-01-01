@@ -4,9 +4,10 @@ use strict;
 use warnings;
 
 use AnyEvent;
-use AnyEventX::Util qw( :all );
+use AnyEventX::CondVar::Util qw( :all );
 use Carp;
-use Data::Dumper;
+
+use version; our $VERSION = version->declare("v0.0.2"); 
 
 our @ISA = qw( AnyEvent::CondVar );
 
@@ -59,6 +60,16 @@ use overload (
     ),
 );
 
+=pod
+
+=head1 NAME
+
+AnyEventX::CondVar - Asynchronous continuation framework for Perl
+
+=cut
+
+### BASIC OPERATORS ###
+
 sub _op2 {
     my ( $op, $self, $other, $swap ) = @_;
 
@@ -89,16 +100,36 @@ sub _op1 {
     });
 }
 
-sub deref {
-    my $self = shift;
+### LIST OPERATORS ###
+
+sub cons {
+    my ( $self, $other ) = @_;
     $self->then( sub {
-        map {
-            ref $_ eq 'HASH' ?
-                %{ $_ } :
-                ref $_ eq 'ARRAY' ?
-                @{ $_ } : $_
-        } @_;
+        my @list = @_;
+        is_cv( $other ) ? 
+            $other->then( sub { ( @list, @_ ) } ) :
+            ( @list, $other );
     });
+}
+
+sub push : method {
+    shift->cons( shift );
+}
+
+sub pop : method {
+    shift->then( sub { pop; @_ } );
+}
+
+sub shift : method {
+    shift->then( sub { shift; @_ } ); 
+}
+
+sub unshift : method {
+    my ( $self, $elem ) = @_;
+    $self->then( sub { 
+        unshift @_, $elem; 
+        @_; 
+    }); 
 }
 
 sub hget {
@@ -125,6 +156,15 @@ sub aget {
     });
 }
 
+sub aset {
+    my ( $self, $pos, $value ) = @_;
+    $self->then( sub {
+        my @list = @_;
+        $list[ $pos ] = $value;
+        @list;
+    });
+}
+
 sub first {
     shift->aget( 0 );
 }
@@ -133,12 +173,26 @@ sub last {
     shift->aget( -1 );
 }
 
-sub aset {
-    my ( $self, $pos, $value ) = @_;
+sub map : method {
+    my ( $self, $fn ) = @_;
     $self->then( sub {
-        my @list = @_;
-        $list[ $pos ] = $value;
-        @list;
+        map { $fn->() } @_;
+    });
+}
+
+sub grep : method {
+    my ( $self, $fn ) = @_;
+    $self->then( sub {
+        grep { $fn->() } @_;
+    });
+}
+
+sub sort : method {
+    my ( $self, $fn ) = @_;
+    $self->then( sub {
+        defined $fn ?
+            sort { $fn->() } @_ :
+            sort @_;
     });
 }
 
@@ -164,6 +218,44 @@ sub mul {
     $cv;
 }
 
+sub unique {
+    my ( $self, $fn ) = @_;
+    $self->then( sub {
+        values %{{ map { $fn->() => $_ } @_ }};
+    });
+}
+
+sub deref {
+    my $self = shift;
+    $self->then( sub {
+        map {
+            ref $_ eq 'HASH' ?
+                %{ $_ } :
+                ref $_ eq 'ARRAY' ?
+                @{ $_ } : $_
+        } @_;
+    });
+}
+
+### BOOLEAN OPERATORS ###
+
+sub and : method {
+    my ( $self, $cb ) = @_;
+    $self->first->then( sub {
+        $_[0] ? $cb->( @_ ) : @_;
+    });
+}
+
+sub or : method {
+    my ( $self, $cb ) = @_;
+    $self->first->then( sub {
+        my ( $x, @xs ) = @_;
+        $_[0] ? @_ : $cb->( @_ );
+    });
+}
+
+### MISC OPERATORS ###
+
 sub any {
     my ( $self, $other ) = @_;
 
@@ -183,62 +275,6 @@ sub any {
         $cv->send( $other );
 
     $cv;
-}
-
-sub map {
-    my ( $self, $fn ) = @_;
-    $self->then( sub {
-        map { $fn->() } @_;
-    });
-}
-
-sub grep {
-    my ( $self, $fn ) = @_;
-    $self->then( sub {
-        grep { $fn->() } @_;
-    });
-}
-
-sub sort {
-    my ( $self, $fn ) = @_;
-    $self->then( sub {
-        defined $fn ?
-            sort { $fn->() } @_ :
-            sort @_;
-    });
-}
-
-sub unique {
-    my ( $self, $fn ) = @_;
-    $self->then( sub {
-        values %{{ map { $fn->() => $_ } @_ }};
-    });
-}
-
-sub and {
-    my ( $self, $cb ) = @_;
-    $self->first->then( sub {
-        $_[0] ? $cb->( @_ ) : @_;
-    });
-}
-
-sub or {
-    my ( $self, $cb ) = @_;
-    $self->first->then( sub {
-        my ( $x, @xs ) = @_;
-        $_[0] ? @_ : $cb->( @_ );
-    });
-}
-
-sub cons {
-    my ( $self, $other ) = @_;
-    my @a;
-    $self->then( sub {
-        @a = @_;
-        is_cv( $other ) ? 
-            $other->then( sub { ( @a, @_ ) } ) :
-            ( @a, $other );
-    });
 }
 
 sub wait {
