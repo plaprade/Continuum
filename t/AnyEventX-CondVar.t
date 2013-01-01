@@ -101,6 +101,12 @@ is_deeply(
 );
 
 is_deeply(
+    [ cv( a => 1, b => 2, c => 3 )->hget( 'c', 'a' )->recv ],
+    [ 3, 1 ],
+    'Hash Get Many'
+);
+
+is_deeply(
     [ cv( a => 1, b => 2, c => 3 )
         ->hset( b => 4 )
         ->hget( 'b' )->recv ],
@@ -112,6 +118,12 @@ is_deeply(
     [ cv( 1, 2, 3, 4 )->aget( 2 )->recv ],
     [ 3 ],
     'Array Get'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->aget( 2, 1 )->recv ],
+    [ 3, 2 ],
+    'Array Get Many'
 );
 
 is_deeply(
@@ -262,6 +274,68 @@ is_deeply(
     'cv_build early return'
 );
 
+is_deeply(
+    [( cv_build { anyevent_cv() } )->recv],
+    [],
+    'cv_build empty anyevent'
+);
+
+is_deeply(
+    [( cv_build { anyevent_cv( 2 ) } )->recv],
+    [ 2 ],
+    'cv_build simple anyevent'
+);
+
+is_deeply(
+    [( cv_build { anyevent_cv( 1, 2, 3 ) } )->recv],
+    [ 1, 2, 3 ],
+    'cv_build list anyevent'
+);
+
+is_deeply(
+    [( 
+        cv_build { 
+            anyevent_cv( 1, 2, 3 ) 
+        } cv_then {
+            anyevent_cv( @_, 4, 5, 6 ) 
+        } cv_then {
+            ( @_, 7 );
+        }
+    )->recv],
+    [ 1, 2, 3, 4, 5, 6, 7 ],
+    'cv_build chain anyevent'
+);
+
+is_deeply(
+    [( 
+        cv_build { 
+            anyevent_cv( 1, 2, 3 ) 
+        } cv_then {
+            cv_result( @_, 4, 5 );
+        } cv_then {
+            ( @_, 7 );
+        }
+    )->recv],
+    [ 1, 2, 3, 4, 5 ],
+    'cv_build chain anyevent early return'
+);
+
+is_deeply(
+    [( 
+        cv_build { 
+            anyevent_cv( 1, 2, 3 ) 
+        } cv_then {
+            $_->( @_, 4, 5 );
+        } cv_then {
+            cv_result( @_, 6 );
+        } cv_then {
+            ( @_, 7 );
+        }
+    )->recv],
+    [ 1, 2, 3, 4, 5, 6 ],
+    'cv_build chain mix'
+);
+
 done_testing();
 
 sub cv {
@@ -270,3 +344,8 @@ sub cv {
     $cv;
 }
 
+sub anyevent_cv {
+    my $cv = AnyEvent->condvar;
+    $cv->send( @_ );
+    $cv;
+}

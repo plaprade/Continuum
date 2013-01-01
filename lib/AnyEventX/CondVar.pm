@@ -133,10 +133,10 @@ sub unshift : method {
 }
 
 sub hget {
-    my ( $self, $key ) = @_;
+    my ( $self, @keys ) = @_;
     $self->then( sub {
         my %h = @_;
-        $h{ $key };
+        map { $h{ $_ } } @keys;
     });
 }
 
@@ -150,9 +150,10 @@ sub hset {
 }
 
 sub aget {
-    my ( $self, $pos ) = @_;
+    my ( $self, @pos ) = @_;
     $self->then( sub {
-        $_[ $pos ];
+        my @list = @_;
+        map { $list[ $_ ] } @pos;
     });
 }
 

@@ -30,6 +30,15 @@ sub cv_build(;&@) {
                     return;
                 };
 
+            is_anyevent_cv( $x ) and do {
+                $x->cb( sub {
+                    defined $next ?
+                        $next->( shift->recv ) :
+                        $cv->send( shift->recv );
+                });
+                return;
+            };
+
             $cv->send( $x, @xs )
                 unless defined $next;
         };
@@ -54,6 +63,11 @@ sub is_result {
 sub is_cv {
     my $val = shift;
     blessed( $val ) && $val->isa( 'AnyEventX::CondVar' );
+}
+
+sub is_anyevent_cv {
+    my $val = shift;
+    blessed( $val ) && $val->isa( 'AnyEvent::CondVar' );
 }
 
 package AnyEventX::CondVar::Result;
