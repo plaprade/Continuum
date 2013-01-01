@@ -10,6 +10,7 @@ require Exporter;
 our @ISA = qw( Exporter );
 our %EXPORT_TAGS = ( all => [ qw(
     cv_build
+    cv_then
     cv_result
     is_cv
 )]);
@@ -24,19 +25,25 @@ sub cv_build(;&@) {
             my ( $x, @xs ) = $f->( @_ );
 
             is_result( $x ) 
-                and $cv->send( $x->value )
-                and return;
+                and do {
+                    $cv->send( $x->value );
+                    return;
+                };
 
             $cv->send( $x, @xs )
                 unless defined $next;
         };
     }
-    $fp->() if defined $fp;
+    defined $fp ?
+        $fp->() :
+        $cv->send();
     $cv;
 }
 
+sub cv_then(&@) { @_ }
+
 sub cv_result {
-    AnyEventX::Util::Result->new( @_ );
+    AnyEventX::CondVar::Result->new( @_ );
 }
 
 sub is_result {

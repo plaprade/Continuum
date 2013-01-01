@@ -5,7 +5,8 @@ use AnyEvent;
 use Test::More; 
 use Data::Dumper;
 
-BEGIN { use_ok( 'AnyEventX::CondVar', qw( :all ) ) };
+BEGIN { use_ok( 'AnyEventX::CondVar' ) };
+BEGIN { use_ok( 'AnyEventX::CondVar::Util', qw( :all ) ) };
 
 run_all( 0, 0 );
 run_all( 0, 1 );
@@ -211,6 +212,54 @@ is_deeply(
     [ cv(2)->cons( cv(3) )->wait( 0.1 )->cons( cv(4) )->recv ],
     [ 2, 3, 4 ],
     'Wait',
+);
+
+### UTIL OPERATIONS ###
+
+is_deeply(
+    [ cv_build->recv ],
+    [],
+    'cv_build empty'
+);
+
+is_deeply(
+    [ ( cv_build { 2 } )->recv ],
+    [ 2 ],
+    'cv_build single scalar'
+);
+
+is_deeply(
+    [ ( cv_build { cv_result(2) } )->recv ],
+    [ 2 ],
+    'cv_build single result'
+);
+
+is_deeply(
+    [( 
+        cv_build { 
+            $_->(1); 
+        } cv_then {
+            $_->( @_, 2 );
+        } cv_then {
+            ( @_, 3 );
+        }
+    )->recv],
+    [ 1, 2, 3 ],
+    'cv_build chain'
+);
+
+is_deeply(
+    [( 
+        cv_build { 
+            $_->(1); 
+        } cv_then {
+            cv_result( @_, 4 );
+        } cv_then {
+            ( @_, 3 );
+        }
+    )->recv],
+    [ 1, 4 ],
+    'cv_build early return'
 );
 
 done_testing();
