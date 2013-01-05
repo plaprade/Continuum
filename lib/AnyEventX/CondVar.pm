@@ -103,12 +103,12 @@ sub _op1 {
 ### LIST OPERATORS ###
 
 sub cons {
-    my ( $self, $other ) = @_;
+    my ( $self, $other, @args ) = @_;
     $self->then( sub {
         my @list = @_;
         is_cv( $other ) ? 
             $other->then( sub { ( @list, @_ ) } ) :
-            ( @list, $other );
+            ( @list, $other, @args );
     });
 }
 
@@ -256,6 +256,11 @@ sub or : method {
 }
 
 ### MISC OPERATORS ###
+
+sub replace {
+    my ( $self, @args ) = @_;
+    $self->then( sub { @args } );
+}
 
 sub any {
     my ( $self, $other ) = @_;

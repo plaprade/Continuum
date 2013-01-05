@@ -12,6 +12,7 @@ our %EXPORT_TAGS = ( all => [ qw(
     cv_build
     cv_then
     cv_result
+    cv_wait
     is_cv
 )]);
 our @EXPORT_OK = @{ $EXPORT_TAGS{ all } }; 
@@ -53,6 +54,16 @@ sub cv_then(&@) { @_ }
 
 sub cv_result {
     AnyEventX::CondVar::Result->new( @_ );
+}
+
+sub cv_wait {
+    my $time = shift;
+    my $cv = AnyEventX::CondVar->new();
+    my $w; $w = AnyEvent->timer( after => $time, cb => sub {
+        undef $w;    
+        $cv->send();
+    });
+    $cv;
 }
 
 sub is_result {

@@ -71,6 +71,12 @@ is_deeply(
 );
 
 is_deeply(
+    [ cv(2)->cons( 3, 4 )->cons( cv(5) )->recv ],
+    [ 2, 3, 4, 5 ],
+    'Cons',
+);
+
+is_deeply(
     [ cv( 1, 2, 3 )->push( cv(4) )->recv ],
     [ 1, 2, 3, 4 ],
     'Push',
@@ -209,6 +215,18 @@ is_deeply(
 ### MISC OPERATORS ###
 
 is_deeply(
+    [ cv(1, 2)->replace( 3, 4 )->cons( 5 )->recv ],
+    [ 3, 4, 5 ],
+    'Replace scalar'
+);
+
+is_deeply(
+    [ cv(1, 2)->replace( cv( 3, 4 ) )->cons( 5 )->recv ],
+    [ 3, 4, 5 ],
+    'Replace condvar'
+);
+
+is_deeply(
     [ cv(1)->wait(0.1)->any( cv(2) )->recv ],
     [ 2 ],
     'Any 1'
@@ -227,6 +245,12 @@ is_deeply(
 );
 
 ### UTIL OPERATIONS ###
+
+is_deeply(
+    [ cv_wait(0.1)->cons( cv( 1, 2 ) )->recv ],
+    [ 1, 2 ],
+    'cv_wait'
+);
 
 is_deeply(
     [ cv_build->recv ],
