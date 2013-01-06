@@ -78,9 +78,9 @@ sub _op2 {
     )->then( sub {
         my ( $a, $b ) = @_;
         my $stm = $swap ?
-            "$b $op $a" :
-            "$a $op $b";
-        my $res = eval( $stm ); 
+            '$b ' . $op . ' $a' :
+            '$a ' . $op . ' $b';
+        my $res = eval( $stm );
         carp "Error evaluating '$stm' : $@" if $@;
         $res;
     });
@@ -301,7 +301,7 @@ sub then {
     my $cv = AnyEventX::CondVar->new();
     $self->cb( sub {
         my @res = $cb->( shift->recv );
-        is_cv( @res ) ?
+        is_cv( $res[0] ) ?
             $res[0]->cb( sub {
                 $cv->send( shift->recv ); 
             }) : 

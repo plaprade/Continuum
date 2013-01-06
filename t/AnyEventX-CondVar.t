@@ -8,35 +8,42 @@ use Data::Dumper;
 BEGIN { use_ok( 'AnyEventX::CondVar' ) };
 BEGIN { use_ok( 'AnyEventX::CondVar::Util', qw( :all ) ) };
 
-run_all( 0, 0 );
-run_all( 0, 1 );
-run_all( 1, 0 );
-run_all( 1, 1 );
-run_all( 2, 2 );
-run_all( 0, -1 );
-run_all( -1, 0 );
-run_all( 1, -2 );
-run_all( -2, 1 );
+test_num( 0, 0 );
+test_num( 0, 1 );
+test_num( 1, 0 );
+test_num( 1, 1 );
+test_num( 2, 2 );
+test_num( 0, -1 );
+test_num( -1, 0 );
+test_num( 1, -2 );
+test_num( -2, 1 );
 
-sub run_all {
+test_str( '', '' );
+test_str( '', 'a' );
+test_str( 'a', '' );
+test_str( 'a', 'a' );
+test_str( 'aa', 'aa' );
+test_str( 'a', 'b' );
+test_str( 'ab', 'aa' );
+
+sub test_num {
     my ( $a, $b ) = @_;
 
     subtest "with_assign with $a and $b" => sub {
 
-        plan tests => $b == 0 ? 26 : 28;
+        plan tests => $b == 0 ? 19 : 21;
 
         foreach my $op ( 
             qw( + - * / % ** << >> x . ), 
             qw( < <= > >= == != ),
-            qw( <=> cmp ),
-            qw( lt le gt ge eq ne ),
+            qw( <=> ),
             qw( & | ^ ),
             qw( ~~ ),
         ){
             next if $op ~~ [qw( / % )] && $b == 0;
             is( 
-                eval( "cv($a) $op cv($b)" )->recv, 
-                eval( "$a $op $b" ),
+                eval( '(cv($a) ' . $op . ' cv($b))->recv' ), 
+                eval( '$a ' . $op . ' $b' ),
                 "Evaluating operator $op"
             ); 
         }
@@ -52,12 +59,34 @@ sub run_all {
         ){
             next if $op ~~ [qw( log sqrt )] && $a <= 0;
             is( 
-                eval( "($op cv($a))->recv" ), 
-                eval( "$op $a" ), 
+                eval( '(' . $op . ' cv($a))->recv' ), 
+                eval( $op . ' $a' ), 
                 "Evaluating operator $op"
             ); 
         }
 
+    };
+
+}
+
+sub test_str {
+    my ( $a, $b ) = @_;
+
+    subtest "String test with $a and $b" => sub {
+
+        plan tests => 8;
+
+        foreach my $op ( 
+            qw( cmp ),
+            qw( lt le gt ge eq ne ),
+            qw( ~~ ),
+        ){
+            is( 
+                eval( '(cv($a) ' . $op . ' cv($b))->recv' ), 
+                eval( '$a ' . $op . ' $b' ),
+                "Evaluating operator $op"
+            ); 
+        }
     };
 
 }
@@ -224,6 +253,35 @@ is_deeply(
     [ cv(1, 2)->replace( cv( 3, 4 ) )->cons( 5 )->recv ],
     [ 3, 4, 5 ],
     'Replace condvar'
+);
+
+is_deeply(
+    [ cv_wait( 0.1 )->then( sub { cv( 3, 4, ) } )
+        ->wait( 0.1 )->replace( cv( 1, 2 ) )->recv ],
+    [ 1, 2 ],
+    'Replace wait'
+);
+
+is_deeply(
+    [ ( cv_build { 
+        my $cv = AnyEvent->condvar; 
+        my $w; $w = AnyEvent->timer( after => 0.05, cb => sub {
+            undef $w;
+            $cv->send( 1, 2 );
+        });
+        $cv;
+    } )->replace( 
+        cv_build {
+            my $cv = AnyEvent->condvar; 
+            my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
+                undef $w;
+                $cv->send( 3, 4 );
+            });
+            $cv;
+        }
+    )->recv ],
+    [ 3, 4 ],
+    'Replace build wait'
 );
 
 is_deeply(
