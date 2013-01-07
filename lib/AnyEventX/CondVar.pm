@@ -184,7 +184,7 @@ sub sort : method {
     my ( $self, $fn ) = @_;
     $self->then( sub {
         defined $fn ?
-            sort { $fn->() } @_ :
+            sort { $fn->( $a, $b ) } @_ :
             sort @_;
     });
 }
