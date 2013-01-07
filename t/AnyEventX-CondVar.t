@@ -94,21 +94,57 @@ sub test_str {
 ### LIST OPERATORS ###
 
 is_deeply(
-    [ cv(2)->cons( cv(3) )->cons( cv(4) )->recv ],
+    [ cv(2)->cons( cv(3) )->cons( 4 )->recv ],
     [ 2, 3, 4 ],
     'Cons',
 );
 
 is_deeply(
-    [ cv(2)->cons( 3, 4 )->cons( cv(5) )->recv ],
+    [ cv(2)->cons( cv(3) )->cons( undef )->recv ],
+    [ 2, 3, undef ],
+    'Cons undef',
+);
+
+is_deeply(
+    [ cv(2)->append( cv(3), 4, cv(5) )->recv ],
     [ 2, 3, 4, 5 ],
-    'Cons',
+    'Append',
+);
+
+is_deeply(
+    [ cv(2)->append( cv(3), 4, cv(5), undef )->recv ],
+    [ 2, 3, 4, 5 ],
+    'Append undef',
+);
+
+is_deeply(
+    [ cv( undef )->append( undef )->recv ],
+    [ undef ],
+    'Append double undef',
+);
+
+is_deeply(
+    [ cv(2)->append( cv(3), undef, 4, cv(5), undef )->recv ],
+    [ 2, 3, undef, 4, 5 ],
+    'Append undef middle',
+);
+
+is_deeply(
+    [ cv(2,3)->then( sub { ( @_, cv(4), 5, cv(6) ) } )->recv ],
+    [ 2, 3, 4, 5, 6 ],
+    'Then',
 );
 
 is_deeply(
     [ cv( 1, 2, 3 )->push( cv(4) )->recv ],
     [ 1, 2, 3, 4 ],
     'Push',
+);
+
+is_deeply(
+    [ cv( 1, 2, 3 )->push( cv(4), 5, cv(6) )->recv ],
+    [ 1, 2, 3, 4, 5, 6 ],
+    'Push list',
 );
 
 is_deeply(
@@ -121,6 +157,12 @@ is_deeply(
     [ cv( 2, 3, 4 )->unshift(1)->recv ],
     [ 1, 2, 3, 4 ],
     'Unshift',
+);
+
+is_deeply(
+    [ cv( 4, 5, 6 )->unshift( cv(1), cv(2), 3 )->recv ],
+    [ 1, 2, 3, 4, 5, 6 ],
+    'Unshift list',
 );
 
 is_deeply(
@@ -192,9 +234,22 @@ is_deeply(
 );
 
 is_deeply(
+    [ cv( 1, 2, 3 )->map( sub{ cv( $_ * 2 ) } )->recv ],
+    [ 2, 4, 6 ],
+    'Flatmap (with map)'
+);
+
+is_deeply(
     [ cv( 1, 2, 3, 4 )->grep( sub { $_ % 2 } )->recv ],
     [ 1, 3 ],
     'Grep'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )
+        ->reduce( sub { $_[0] + $_[1] }, 2, 3 )->recv ],
+    [ 15 ],
+    'Reduce'
 );
 
 is_deeply(
@@ -244,22 +299,35 @@ is_deeply(
 ### MISC OPERATORS ###
 
 is_deeply(
-    [ cv(1, 2)->replace( 3, 4 )->cons( 5 )->recv ],
-    [ 3, 4, 5 ],
-    'Replace scalar'
+    [
+        cv( 1, 2, 3 )
+            ->map( sub { $_ * 2 } )
+            ->push_stash
+            ->map( sub { $_ / 2 } )
+            ->pop_stash
+            ->recv
+    ],
+    [ 2, 4, 6 ],
+    'Stash'
 );
 
 is_deeply(
-    [ cv(1, 2)->replace( cv( 3, 4 ) )->cons( 5 )->recv ],
+    [ cv(1, 2)->result( 3, 4 )->cons( 5 )->recv ],
     [ 3, 4, 5 ],
-    'Replace condvar'
+    'Result scalar'
+);
+
+is_deeply(
+    [ cv(1, 2)->result( cv( 3, 4 ) )->cons( 5 )->recv ],
+    [ 3, 4, 5 ],
+    'Result condvar'
 );
 
 is_deeply(
     [ cv_wait( 0.1 )->then( sub { cv( 3, 4, ) } )
-        ->wait( 0.1 )->replace( cv( 1, 2 ) )->recv ],
+        ->wait( 0.1 )->result( cv( 1, 2 ) )->recv ],
     [ 1, 2 ],
-    'Replace wait'
+    'Result wait'
 );
 
 is_deeply(
@@ -270,7 +338,7 @@ is_deeply(
             $cv->send( 1, 2 );
         });
         $cv;
-    } )->replace( 
+    } )->result( 
         cv_build {
             my $cv = AnyEvent->condvar; 
             my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
@@ -281,7 +349,7 @@ is_deeply(
         }
     )->recv ],
     [ 3, 4 ],
-    'Replace build wait'
+    'Result build wait'
 );
 
 is_deeply(

@@ -5,6 +5,7 @@ use warnings;
 
 use AnyEvent;
 use AnyEventX::CondVar::Util qw( :all );
+use List::Util;
 use Carp;
 
 use version; our $VERSION = version->declare("v0.0.2"); 
@@ -102,34 +103,25 @@ sub _op1 {
 
 ### LIST OPERATORS ###
 
-sub cons {
-    my ( $self, $other, @args ) = @_;
-    $self->then( sub {
-        my @list = @_;
-        is_cv( $other ) ? 
-            $other->then( sub { ( @list, @_ ) } ) :
-            ( @list, $other, @args );
-    });
-}
-
 sub push : method {
-    shift->cons( shift );
+    my ( $self, @elems ) = @_;
+    $self->append( @elems );
 }
 
 sub pop : method {
     shift->then( sub { pop; @_ } );
 }
 
-sub shift : method {
-    shift->then( sub { shift; @_ } ); 
+sub unshift : method {
+    my ( $self, $x, @xs ) = @_;
+    $self->then( sub { 
+        ( is_cv($x) ? $x : (cv_build{$x}))
+            ->append( @xs, @_ );
+    }); 
 }
 
-sub unshift : method {
-    my ( $self, $elem ) = @_;
-    $self->then( sub { 
-        unshift @_, $elem; 
-        @_; 
-    }); 
+sub shift : method {
+    shift->then( sub { shift; @_ } ); 
 }
 
 sub hget {
@@ -197,26 +189,21 @@ sub sort : method {
     });
 }
 
+sub reduce : method {
+    my ( $self, $fn, @acc ) = @_;
+    $self->then( sub {
+        List::Util::reduce { $fn->( $a, $b ) } ( @acc, @_ );
+    });
+}
+
 sub sum {
     my $self = shift;
-    my $cv = AnyEventX::CondVar->new();
-    $self->cb( sub {
-        my $sum = 0;
-        $sum += $_ for ( shift->recv );
-        $cv->send( $sum );
-    });
-    $cv;
+    $self->reduce( sub { $_[0] + $_[1] } );
 }
 
 sub mul {
     my $self = shift;
-    my $cv = AnyEventX::CondVar->new();
-    $self->cb( sub {
-        my $mul = 1;
-        $mul *= $_ for ( shift->recv );
-        $cv->send( $mul );
-    });
-    $cv;
+    $self->reduce( sub { $_[0] * $_[1] } );
 }
 
 sub unique {
@@ -226,6 +213,7 @@ sub unique {
     });
 }
 
+# TODO : NAMING ?? USEFULL ??
 sub deref {
     my $self = shift;
     $self->then( sub {
@@ -257,7 +245,25 @@ sub or : method {
 
 ### MISC OPERATORS ###
 
-sub replace {
+my @stash;
+
+sub push_stash {
+    my $self = shift;
+    $self->then( sub {
+        push @stash, \@_;
+        @_;
+    });
+}
+
+sub pop_stash {
+    my $self = shift;
+    $self->then( sub {
+        @{ pop @stash };
+    });
+}
+
+# TODO: NAMING ??!?!?
+sub result {
     my ( $self, @args ) = @_;
     $self->then( sub { @args } );
 }
@@ -300,14 +306,37 @@ sub then {
     my ( $self, $cb ) = @_;
     my $cv = AnyEventX::CondVar->new();
     $self->cb( sub {
-        my @res = $cb->( shift->recv );
-        is_cv( $res[0] ) ?
-            $res[0]->cb( sub {
-                $cv->send( shift->recv ); 
-            }) : 
-            $cv->send( @res );
+        my ( $x, @xs ) = $cb->( shift->recv );
+
+        (( is_cv($x) ? $x : (cv_build{$x}) )
+            ->append( @xs ))
+                ->cb( sub {
+                    $cv->send( shift->recv );
+                });
+
     });
     $cv;
 }
+
+sub append {
+    my ( $self, $x, @xs ) = @_;
+    return $self unless defined $x || @xs;
+    $self->cons( $x )->append( @xs );
+}
+
+sub cons {
+    my ( $self, $other ) = @_;
+    my $cv = AnyEventX::CondVar->new();
+    $self->cb( sub {
+        my @left = shift->recv;
+        is_cv( $other ) ?
+            $other->cb( sub {
+                $cv->send( @left, shift->recv );
+            }) :
+            $cv->send( @left, $other );
+    });
+    $cv;
+}
+
 
 1;
