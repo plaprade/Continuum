@@ -228,6 +228,13 @@ is_deeply(
 );
 
 is_deeply(
+    [ cv( [1,3], [2,2], [3,1] )->sort( 
+        sub { $a->[1] <=> $b->[1] } )->recv ],
+    [ [3,1], [2,2], [1,3] ],
+    'Sort',
+);
+
+is_deeply(
     [ cv( 1, 2, 3, 4 )->map( sub { $_ * 2 } )->recv ],
     [ 2, 4, 6, 8 ],
     'Map'
@@ -247,7 +254,7 @@ is_deeply(
 
 is_deeply(
     [ cv( 1, 2, 3, 4 )
-        ->reduce( sub { $_[0] + $_[1] }, 2, 3 )->recv ],
+        ->reduce( sub { $a + $b }, 2, 3 )->recv ],
     [ 15 ],
     'Reduce'
 );

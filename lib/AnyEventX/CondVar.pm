@@ -7,6 +7,7 @@ use AnyEvent;
 use AnyEventX::CondVar::Util qw( :all );
 use List::Util;
 use Carp;
+require Exporter;
 
 use version; our $VERSION = version->declare("v0.0.2"); 
 
@@ -182,28 +183,44 @@ sub grep : method {
 
 sub sort : method {
     my ( $self, $fn ) = @_;
+
+    my $caller = caller;
+
     $self->then( sub {
-        defined $fn ?
-            sort { $fn->( $a, $b ) } @_ :
-            sort @_;
+        no strict 'refs';
+        defined $fn ? sort { 
+                $caller ne 'AnyEventX::CondVar'
+                    and local( *{ $caller . '::a' } ) = \$a
+                    and local( *{ $caller . '::b' } ) = \$b;
+                $fn->(); 
+            } @_ : sort @_;
     });
 }
 
 sub reduce : method {
     my ( $self, $fn, @acc ) = @_;
+
+    my $caller = caller;
+
     $self->then( sub {
-        List::Util::reduce { $fn->( $a, $b ) } ( @acc, @_ );
+        no strict 'refs';
+        List::Util::reduce { 
+            $caller ne 'AnyEventX::CondVar'
+                and local( *{ $caller . '::a' } ) = \$a
+                and local( *{ $caller . '::b' } ) = \$b;
+            $fn->();
+        } ( @acc, @_ );
     });
 }
 
 sub sum {
     my $self = shift;
-    $self->reduce( sub { $_[0] + $_[1] } );
+    $self->reduce( sub { $a + $b } );
 }
 
 sub mul {
     my $self = shift;
-    $self->reduce( sub { $_[0] * $_[1] } );
+    $self->reduce( sub { $a * $b } );
 }
 
 sub unique {
