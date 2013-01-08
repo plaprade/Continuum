@@ -9,6 +9,7 @@ require Exporter;
 
 our @ISA = qw( Exporter );
 our %EXPORT_TAGS = ( all => [ qw(
+    cv
     cv_build
     cv_then
     cv_result
@@ -51,6 +52,12 @@ sub cv_build(;&@) {
 }
 
 sub cv_then(&@) { @_ }
+
+sub cv {
+    my $cv = AnyEventX::CondVar->new();
+    $cv->send( @_ );
+    $cv;
+}
 
 sub cv_result {
     AnyEventX::CondVar::Result->new( @_ );

@@ -91,7 +91,7 @@ sub test_str {
 
 }
 
-### LIST OPERATORS ###
+### Concatenation - Append ###
 
 is_deeply(
     [ cv(2)->cons( cv(3) )->cons( 4 )->recv ],
@@ -129,11 +129,15 @@ is_deeply(
     'Append undef middle',
 );
 
+### Continuation - Data dependencies ### 
+
 is_deeply(
     [ cv(2,3)->then( sub { ( @_, cv(4), 5, cv(6) ) } )->recv ],
     [ 2, 3, 4, 5, 6 ],
     'Then',
 );
+
+### List operations ### 
 
 is_deeply(
     [ cv( 1, 2, 3 )->push( cv(4) )->recv ],
@@ -171,25 +175,7 @@ is_deeply(
     'Shift',
 );
 
-is_deeply(
-    [ cv( a => 1, b => 2, c => 3 )->hget( 'c' )->recv ],
-    [ 3 ],
-    'Hash Get'
-);
-
-is_deeply(
-    [ cv( a => 1, b => 2, c => 3 )->hget( 'c', 'a' )->recv ],
-    [ 3, 1 ],
-    'Hash Get Many'
-);
-
-is_deeply(
-    [ cv( a => 1, b => 2, c => 3 )
-        ->hset( b => 4 )
-        ->hget( 'b' )->recv ],
-    [ 4 ],
-    'Hash Set'
-);
+### Get/Set List elements ###
 
 is_deeply(
     [ cv( 1, 2, 3, 4 )->aget( 2 )->recv ],
@@ -221,18 +207,29 @@ is_deeply(
     'Last'
 );
 
+### Get/Set Hash elements ###
+
 is_deeply(
-    [ cv( 1, 4, 2, 1, 3, 2, 1 )->unique( sub{ $_ } )->sort->recv ],
-    [ 1, 2, 3, 4 ],
-    'Unique & Sort',
+    [ cv( a => 1, b => 2, c => 3 )->hget( 'c' )->recv ],
+    [ 3 ],
+    'Hash Get'
 );
 
 is_deeply(
-    [ cv( [1,3], [2,2], [3,1] )->sort( 
-        sub { $a->[1] <=> $b->[1] } )->recv ],
-    [ [3,1], [2,2], [1,3] ],
-    'Sort',
+    [ cv( a => 1, b => 2, c => 3 )->hget( 'c', 'a' )->recv ],
+    [ 3, 1 ],
+    'Hash Get Many'
 );
+
+is_deeply(
+    [ cv( a => 1, b => 2, c => 3 )
+        ->hset( b => 4 )
+        ->hget( 'b' )->recv ],
+    [ 4 ],
+    'Hash Set'
+);
+
+### Advanced List operations ###
 
 is_deeply(
     [ cv( 1, 2, 3, 4 )->map( sub { $_ * 2 } )->recv ],
@@ -250,6 +247,25 @@ is_deeply(
     [ cv( 1, 2, 3, 4 )->grep( sub { $_ % 2 } )->recv ],
     [ 1, 3 ],
     'Grep'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->grep( sub{ cv( $_ % 2 ) } )->recv ],
+    [ 1, 3 ],
+    'Flatgrep (with grep)'
+);
+
+is_deeply(
+    [ cv( 1, 4, 2, 1, 3, 2, 1 )->unique( sub{ $_ } )->sort->recv ],
+    [ 1, 2, 3, 4 ],
+    'Unique & Sort',
+);
+
+is_deeply(
+    [ cv( [1,3], [2,2], [3,1] )->sort( 
+        sub { $a->[1] <=> $b->[1] } )->recv ],
+    [ [3,1], [2,2], [1,3] ],
+    'Sort',
 );
 
 is_deeply(
@@ -271,13 +287,7 @@ is_deeply(
     'Mul'
 );
 
-is_deeply(
-    [ cv( [ 1, 2, 3 ], 4, { 5 => 6 } )->deref->recv ],
-    [ 1, 2, 3, 4, 5, 6 ],
-    'Deref',
-);
-
-### BOOLEAN OPERATORS ###
+### Boolean operations ###
 
 is_deeply(
     [ ( cv(2) == 2 )->and( sub { 3 } )->recv ],
@@ -303,7 +313,7 @@ is_deeply(
     'Or false',
 );
 
-### MISC OPERATORS ###
+### Stash operations ###
 
 is_deeply(
     [
@@ -316,6 +326,45 @@ is_deeply(
     ],
     [ 2, 4, 6 ],
     'Stash'
+);
+
+is_deeply(
+    [
+        cv( 1, 2, 3 )
+            ->map( sub { $_ * 2 } )
+            ->push_stash
+            ->map( sub { $_ * 2 } )
+            ->push_stash
+            ->map( sub { $_ / 2 } )
+            ->pop_stash
+            ->recv
+    ],
+    [ 4, 8, 16 ],
+    'Stash multi level'
+);
+
+is_deeply(
+    [
+        cv( 1, 2, 3 )
+            ->map( sub { $_ * 2 } )
+            ->push_stash
+            ->map( sub { $_ * 2 } )
+            ->push_stash
+            ->map( sub { $_ / 2 } )
+            ->pop_stash
+            ->pop_stash
+            ->recv
+    ],
+    [ 2, 4, 6 ],
+    'Stash multi level 2'
+);
+
+### MISC Operators ###
+
+is_deeply(
+    [ cv( [ 1, 2, 3 ], 4, { 5 => 6 } )->deref->recv ],
+    [ 1, 2, 3, 4, 5, 6 ],
+    'Deref',
 );
 
 is_deeply(
@@ -377,7 +426,7 @@ is_deeply(
     'Wait',
 );
 
-### UTIL OPERATIONS ###
+### Utility Operators ###
 
 is_deeply(
     [ cv_wait(0.1)->cons( cv( 1, 2 ) )->recv ],
@@ -494,12 +543,6 @@ is_deeply(
 );
 
 done_testing();
-
-sub cv {
-    my $cv = AnyEventX::CondVar->new();
-    $cv->send( @_ );
-    $cv;
-}
 
 sub anyevent_cv {
     my $cv = AnyEvent->condvar;

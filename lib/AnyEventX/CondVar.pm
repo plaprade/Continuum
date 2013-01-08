@@ -70,7 +70,7 @@ AnyEventX::CondVar - Asynchronous continuation framework for Perl
 
 =cut
 
-### BASIC OPERATORS ###
+### Basic Perl operator overload ###
 
 sub _op2 {
     my ( $op, $self, $other, $swap ) = @_;
@@ -93,16 +93,54 @@ sub _op1 {
 
     $self->first->then( sub {
         my $a = shift;
-        return ($a + 1) if $op eq '++';
-        return ($a - 1) if $op eq '--';
-        my $stm = "$op $a";
+        my $stm = $op . '$a';
         my $res = eval( $stm ); 
         carp "Error evaluating '$stm' : $@" if $@;
         $res;
     });
 }
 
-### LIST OPERATORS ###
+### Concatenation - Append ###
+
+sub cons {
+    my ( $self, $other ) = @_;
+    my $cv = AnyEventX::CondVar->new();
+    $self->cb( sub {
+        my @left = shift->recv;
+        is_cv( $other ) ?
+            $other->cb( sub {
+                $cv->send( @left, shift->recv );
+            }) :
+            $cv->send( @left, $other );
+    });
+    $cv;
+}
+
+sub append {
+    my ( $self, $x, @xs ) = @_;
+    return $self unless defined $x || @xs;
+    $self->cons( $x )->append( @xs );
+}
+
+### Continuation - Data dependencies ###
+
+sub then {
+    my ( $self, $cb ) = @_;
+    my $cv = AnyEventX::CondVar->new();
+    $self->cb( sub {
+        my ( $x, @xs ) = $cb->( shift->recv );
+
+        (( is_cv($x) ? $x : (cv_build{$x}) )
+            ->append( @xs ))
+                ->cb( sub {
+                    $cv->send( shift->recv );
+                });
+
+    });
+    $cv;
+}
+
+### List operations ###
 
 sub push : method {
     my ( $self, @elems ) = @_;
@@ -125,22 +163,7 @@ sub shift : method {
     shift->then( sub { shift; @_ } ); 
 }
 
-sub hget {
-    my ( $self, @keys ) = @_;
-    $self->then( sub {
-        my %h = @_;
-        map { $h{ $_ } } @keys;
-    });
-}
-
-sub hset {
-    my ( $self, $key, $value ) = @_;
-    $self->then( sub {
-        my %h = @_;
-        $h{ $key } = $value;
-        %h;
-    });
-}
+### Get/Set List elements ###
 
 sub aget {
     my ( $self, @pos ) = @_;
@@ -166,6 +189,27 @@ sub first {
 sub last {
     shift->aget( -1 );
 }
+
+### Get/Set Hash elements ###
+
+sub hget {
+    my ( $self, @keys ) = @_;
+    $self->then( sub {
+        my %h = @_;
+        map { $h{ $_ } } @keys;
+    });
+}
+
+sub hset {
+    my ( $self, $key, $value ) = @_;
+    $self->then( sub {
+        my %h = @_;
+        $h{ $key } = $value;
+        %h;
+    });
+}
+
+### Advanced List operations ###
 
 sub map : method {
     my ( $self, $fn ) = @_;
@@ -213,6 +257,13 @@ sub reduce : method {
     });
 }
 
+sub unique {
+    my ( $self, $fn ) = @_;
+    $self->then( sub {
+        values %{{ map { $fn->() => $_ } @_ }};
+    });
+}
+
 sub sum {
     my $self = shift;
     $self->reduce( sub { $a + $b } );
@@ -223,27 +274,7 @@ sub mul {
     $self->reduce( sub { $a * $b } );
 }
 
-sub unique {
-    my ( $self, $fn ) = @_;
-    $self->then( sub {
-        values %{{ map { $fn->() => $_ } @_ }};
-    });
-}
-
-# TODO : NAMING ?? USEFULL ??
-sub deref {
-    my $self = shift;
-    $self->then( sub {
-        map {
-            ref $_ eq 'HASH' ?
-                %{ $_ } :
-                ref $_ eq 'ARRAY' ?
-                @{ $_ } : $_
-        } @_;
-    });
-}
-
-### BOOLEAN OPERATORS ###
+### Boolean operations ###
 
 sub and : method {
     my ( $self, $cb ) = @_;
@@ -260,7 +291,7 @@ sub or : method {
     });
 }
 
-### MISC OPERATORS ###
+### Stash operations ###
 
 my @stash;
 
@@ -276,6 +307,21 @@ sub pop_stash {
     my $self = shift;
     $self->then( sub {
         @{ pop @stash };
+    });
+}
+
+### MISC Operators ###
+
+# TODO : NAMING ?? USEFULL ??
+sub deref {
+    my $self = shift;
+    $self->then( sub {
+        map {
+            ref $_ eq 'HASH' ?
+                %{ $_ } :
+                ref $_ eq 'ARRAY' ?
+                @{ $_ } : $_
+        } @_;
     });
 }
 
@@ -319,41 +365,6 @@ sub wait {
     $cv;
 }
 
-sub then {
-    my ( $self, $cb ) = @_;
-    my $cv = AnyEventX::CondVar->new();
-    $self->cb( sub {
-        my ( $x, @xs ) = $cb->( shift->recv );
-
-        (( is_cv($x) ? $x : (cv_build{$x}) )
-            ->append( @xs ))
-                ->cb( sub {
-                    $cv->send( shift->recv );
-                });
-
-    });
-    $cv;
-}
-
-sub append {
-    my ( $self, $x, @xs ) = @_;
-    return $self unless defined $x || @xs;
-    $self->cons( $x )->append( @xs );
-}
-
-sub cons {
-    my ( $self, $other ) = @_;
-    my $cv = AnyEventX::CondVar->new();
-    $self->cb( sub {
-        my @left = shift->recv;
-        is_cv( $other ) ?
-            $other->cb( sub {
-                $cv->send( @left, shift->recv );
-            }) :
-            $cv->send( @left, $other );
-    });
-    $cv;
-}
 
 
 1;
