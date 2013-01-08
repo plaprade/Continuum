@@ -81,7 +81,7 @@ following reasons:
 
 =item *
 
-You save yourself an argument in your function calls
+Your API can be used in a blocking or non-blocking fashion
 
 =item *
 
@@ -89,7 +89,7 @@ You return meaningful values from your asynchronous functions
 
 =item *
 
-Your API can be used in a blocking or non-blocking fashion
+You save yourself an argument in your function calls
 
 =back
 
@@ -99,7 +99,7 @@ Building asynchronous APIs then boils down to:
 
 =item *
 
-Performing asynchronous operations ( HTTP, Database, File IO, ...  )
+Performing asynchronous operations ( HTTP, database, file IO, ...  )
 
 =item *
 
