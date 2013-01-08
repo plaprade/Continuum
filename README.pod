@@ -6,9 +6,9 @@ B<! This module is work in progress. The code is likely to change. And
 the documentation as well !>
 
 AnyEventX-CondVar is a wrapper module around L<AnyEvent> condition
-variables. It's purpose is to provide a clean and readible API for
+variables. It's purpose is to provide a clean and readable API for
 manipulating condition variables. This is achieved by extending the
-L<AnyEvent::CondVar|AnyEvent> library with chainable transformations.
+L<AnyEvent::CondVar|AnyEvent> library with chain-able transformations.
 
 Condition variables are promises of delivering results. They are used
 in asynchronous frameworks as an alternative to callbacks and for
@@ -17,7 +17,7 @@ L<AnyEvent> documentation on condition variables if you are not
 already familiar with them.
 
 Returning condition variables from asynchronous API's is generally
-more flexible than requirering callbacks as users can decide to block
+more flexible than requiring callbacks as users can decide to block
 or not on API calls. The downside of building complex operations with
 condition variables is code readability. It's easy to end up with
 embedded callback code and spaghetti flows of execution. This library
@@ -120,7 +120,7 @@ new ones for simple transformations.
 
         $db->get( 'zoo_animals' )->cb( sub {
             my @animals = shift->recv;
-            $cv->send( grep { $_->type eq 'penguin' } );
+            $cv->send( grep { $_->type eq 'penguin' } @animals );
         });
 
         $cv;
@@ -140,7 +140,7 @@ that can be automatically generated for you. Both examples above are
 functionally identical. This example holds for many list
 transformations such as C<map>, C<sort> and C<reduce>.
 
-Somethine else you might be doing a lot when writing asynchronous code
+Something else you might be doing a lot when writing asynchronous code
 is performing parallel operations with merge-point callbacks.
 
     use AnyEvent;
@@ -160,8 +160,8 @@ is performing parallel operations with merge-point callbacks.
     });
 
 We provide two powerful constructs for dealing with this problem:
-C<cons> and C<then> for concatenating condition variables and dealing
-with data dependencies.
+C<cons> and C<then> for concatenating condition variables and handling
+data dependencies.
 
     use AnyEvent::CondVar;
 
@@ -171,7 +171,7 @@ with data dependencies.
             # Do stuff with roy and silo. Be nice !
         });
 
-From the example above, you can notice that calls such as C<cons> and
+From the example above, you notice that calls such as C<cons> and
 C<then> can be chained. This holds true for every method in this
 library. Every call produces a new condition variable holding the
 result of the previous transformation. 
