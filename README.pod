@@ -21,8 +21,8 @@ more flexible than requiring callbacks as users can decide to block
 or not on API calls. The downside of building complex operations with
 condition variables is code readability. It's easy to end up with
 embedded callback code and spaghetti flows of execution. This library
-is an attempt at solving these issues and make it easy and fun to code
-with condition variables. I hope you find it useful!
+is an attempt at solving these issues and make asynchronous
+programming in Perl fun. I hope you find it useful!
 
 Let's start with an example. Given a list of C<@keys>, we want to
 retrieve the database values for each key in parallel and return the
@@ -65,7 +65,11 @@ And using the C<AnyEventX::CondVar> approach:
         });
     }
 
-Power comes from conciseness, all other things being equal.
+Power comes from conciseness, all other things being equal. The
+behavior of the first example is not immediately obvious. It requires
+some mental parsing to understand the non-linear execution flow of the
+code. The second example has the merit of describing functionality in
+a short and effective way. It is also much easier to maintain.
 
 =head2 Design philosophy
 
@@ -95,7 +99,7 @@ Building asynchronous APIs then boils down to:
 
 =item *
 
-Performing asynchronous operations ( HTTP, Database )
+Performing asynchronous operations ( HTTP, Database, File IO, ...  )
 
 =item *
 
@@ -111,7 +115,7 @@ Our goal is to make the data transformations as clear and effective as
 possible. We claim that in most cases, it is not necessary to leave
 the realm of condition variables to describe data transformations.  It
 is somewhat wasteful to "peek" into condition variables and build
-new ones for simple transformations.
+new ones for simple transformations:
 
     use AnyEvent;
 
@@ -136,12 +140,12 @@ The above example could be more concisely describe as follows:
     }
 
 Using the second form saves you from writing a lot of boilerplate code
-that can be automatically generated for you. Both examples above are
+that can be automatically handled for you. Both examples above are
 functionally identical. This example holds for many list
 transformations such as C<map>, C<sort> and C<reduce>.
 
 Something else you might be doing a lot when writing asynchronous code
-is performing parallel operations with merge-point callbacks.
+is performing parallel operations with merge-point callbacks:
 
     use AnyEvent;
 
@@ -150,10 +154,16 @@ is performing parallel operations with merge-point callbacks.
     my ( $roy, $silo );
 
     $cv->begin;
-    $db->get( 'roy' )->cb( sub { $roy = shift->recv; $cv->end; } );
+    $db->get( 'roy' )->cb( sub { 
+        $roy = shift->recv; 
+        $cv->end; 
+    });
 
     $cv->begin;
-    $db->get( 'silo' )->cb( sub { $silo = shift->recv; $cv->end; } );
+    $db->get( 'silo' )->cb( sub { 
+        $silo = shift->recv; 
+        $cv->end; 
+    });
 
     $cv->cb( sub {
         # Do stuff with roy and silo. Be gentle !
@@ -161,11 +171,12 @@ is performing parallel operations with merge-point callbacks.
 
 We provide two powerful constructs for dealing with this problem:
 C<cons> and C<then> for concatenating condition variables and handling
-data dependencies.
+data dependencies:
 
     use AnyEvent::CondVar;
 
-    $db->get( 'roy' )->cons( $db->get( 'silo' ) )
+    $db->get( 'roy' )
+        ->cons( $db->get( 'silo' ) )
         ->then( sub {
             my ( $roy, $silo ) = @_;
             # Do stuff with roy and silo. Be nice !
@@ -176,74 +187,47 @@ C<then> can be chained. This holds true for every method in this
 library. Every call produces a new condition variable holding the
 result of the previous transformation. 
 
-=head2 Advanced usage
+=head2 Continuation style
 
-C<then> is probably the most powerful call as it is used internally to
-implement most of the API. C<then> produces a new condition variable
-that holds the return value of your callback. If your callback returns
-a condition variable, C<then> will link it to it's own condition
-variable. This allows for powerful chaining of condition variables
-with data dependencies:
+Continuations are the basic building blocks of asynchronous programs.
+In this library, they are provided by the C<then> operation. From a
+C<then> callback, you can return any value which will automatically
+become available to the next chained operation: 
 
-    use AnyEvent::CondVar;
+    $db->get( 'a' )
+        ->then( sub { a => shift } )
+        ->then( sub { my ( $key, $value ) = @_ } );
 
-    $db->get( 'roy' )->cons( $db->get( 'silo' ) )
-        ->then( sub {
-            my ( $roy, $silo ) = @_;
-            $_->birthday for (( $roy, $silo ));
-            $db->set( $roy )->cons( $db->set( $silo ) ); 
-        })
-        ->then( sub {
-            my ( $roy, $silo ) = @_;
-            # We're done saving. Continue here ... 
-        });
+You can also return a condition variable from a C<then> callback. The
+internal value of the condition variable will be automatically
+available to the next chained operation:
 
-C<then> even allows you to return a mix of condition variables and
-traditional scalars in a list. It will produce a new condition
-variable holding the concatenation of all the returned values. It does
-the right thing as expected:
+    $db->get( 'a' )
+        ->then( sub { $db->get( 'b' ) } )
+        ->then( sub { my $b = shift; } );
 
-    use AnyEvent::CondVar;
+You can return multiple condition variables from a C<then> callback.
+You can even mix them with regular values. C<then> does the right
+thing by making the regular values directly available to the next
+chained operation, together with the internal values of the condition
+variables:
 
-    $db->get( 'roy' )->cons( $db->get( 'silo' ) )
-        ->then( sub {
-            my ( $roy, $silo ) = @_;
-            $_->birthday for (( $roy, $silo ));
-            ( 
-                $db->set( $roy ), # Condvar
-                $db->set( $silo ), # Condvar
-                $roy->age, #Scalar
-                $silo->age, #Scalar
-            ); 
-        })
-        ->then( sub {
-            my ( $roy, $silo, $roy_age, $silo_age ) = @_;
-            # We're done saving. Continue here ... 
-        });
+    $db->get( 'a' )
+        ->then( sub { shift, $db->get( 'b' ) } )
+        ->then( sub { my ( $a, $b ) = @_ } );
 
-This powerful feature is available in most calls of this API. Let's
-take the first C<map> example again from the top of the page:
+This holds for most of the functions in the API. You can use C<map> to
+transform values into a mix of regular variables and condition
+variables and chain it with C<then> to fetch all the results:
 
-    use AnyEventX::CondVar;
+    cv( @keys )
+        ->map( sub { $_ => $db->get( $_ ) } )
+        ->then( sub { my %results = @_ } );
 
-    sub get_keys {
-        cv( @_ )->map( sub { 
-            $_ => $db->get( $_ )
-        });
-    }
-
-This map transforms the keys into condition variables generated by
-C<$db>.  Because C<map> is implemented internally using C<then>, it
-returns a condition variable that will hold the concatenation of all
-the database results. You could provide a continuation to this map to
-handle the results once they are available:
-
-    cv( @_ )->map( sub { 
-        $_ => $db->get( $_ )
-    })->then( sub {
-        my %results = @_;
-        # Do stuff with the %results
-    })
+C<cv> is only a helper function to access the API if you don't have an
+initial condition variable. Note that in all of the examples above, we
+do not perform any blocking calls. We only describe how the data
+should be transformed once it becomes available. 
 
 =head2 More please !
 
