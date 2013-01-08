@@ -41,8 +41,7 @@ case and C<AnyEventX::CondVar> objects in the second case.
         $cv;
     }
 
-Now here is how you would write the piece of code with
-C<AnyEventX::CondVar>:
+And using C<AnyEventX::CondVar>:
 
     use AnyEventX::CondVar;
 
@@ -239,7 +238,22 @@ providing merge points of parallel executions such as:
 
 You can also think of C<then> as providing a way of handling
 asynchronous data dependencies. C<then> is used internally to
-implement most of this library's API.
+implement most of this library's API. Whatever you return from C<then>
+will be returned from that condition variable. In the above example,
+that would be C<( $a2, $b2 )>. You can also return a condition
+variable from within C<then> and continue chaining calls:
+
+    $db->get( 'a' )->cons( $db->get( 'b' ) )
+        ->then( sub {
+            my ( $a, $b ) = @_;
+            ( $a, $b ,$db->get( 'c' ) ) })
+        ->then( sub {
+            my ( $a, $b, $c ) = @_
+        });
+
+C<then> does a bit of internal magic to retrieve the values of
+the returned condition variables to make them available to the next
+method call.
 
 =head2 Bugs
 
