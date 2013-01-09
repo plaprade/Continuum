@@ -11,6 +11,7 @@ manipulating condition variables. This is achieved by extending the
 L<AnyEvent::CondVar|AnyEvent> library with chainable transformations.
 It produces asynchronous code with the following style:
 
+    # ping, list_files and fetch_file produce condition variables
     ping( 'host1' )->cons( ping( 'host2' ) )
         ->map( sub{ list_files( $_ ) } )
         ->map( sub{ fetch_file( $_ ) } )
