@@ -173,7 +173,7 @@ We provide two powerful constructs for dealing with this problem:
 C<cons> and C<then> for concatenating condition variables and handling
 data dependencies:
 
-    use AnyEvent::CondVar;
+    use AnyEventX::CondVar;
 
     $db->get( 'roy' )
         ->cons( $db->get( 'silo' ) )
