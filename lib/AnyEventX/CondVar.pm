@@ -13,7 +13,8 @@ use version; our $VERSION = version->declare("v0.0.2");
 
 our @ISA = qw( AnyEvent::CondVar );
 
-#my %ops = (
+#    All Perl operators:
+#
 #    with_assign => [ qw( + - * / % ** << >> x . ) ],
 #    assign => [ qw( += -= *= /= %= **= <<= >>= x= .= ) ],
 #    num_comparison => [ qw( < <= > >= == != ) ],
@@ -29,7 +30,7 @@ our @ISA = qw( AnyEvent::CondVar );
 #    dereferencing => [ qw( ${} @{} %{} &{} *{} ) ],
 #    matching => [ qw( ~~ ) ],
 #    special => [ qw( nomethod fallback = ) ],
-#);
+#
 
 use overload (
     ( map { my $op = $_; $op => sub { _op2( $op, @_ ) }  }
@@ -128,14 +129,10 @@ sub then {
     my ( $self, $cb ) = @_;
     my $cv = AnyEventX::CondVar->new();
     $self->cb( sub {
-        my ( $x, @xs ) = $cb->( shift->recv );
-
-        (( is_cv($x) ? $x : (cv_build{$x}) )
-            ->append( @xs ))
-                ->cb( sub {
-                    $cv->send( shift->recv );
-                });
-
+        my @res = $cb->( shift->recv );
+        cv->append( @res )->cb( sub {
+            $cv->send( shift->recv );
+        });
     });
     $cv;
 }
@@ -143,8 +140,8 @@ sub then {
 ### List operations ###
 
 sub push : method {
-    my ( $self, @elems ) = @_;
-    $self->append( @elems );
+    my ( $self, @list ) = @_;
+    $self->append( @list );
 }
 
 sub pop : method {
@@ -152,10 +149,9 @@ sub pop : method {
 }
 
 sub unshift : method {
-    my ( $self, $x, @xs ) = @_;
+    my ( $self, @list ) = @_;
     $self->then( sub { 
-        ( is_cv($x) ? $x : (cv_build{$x}))
-            ->append( @xs, @_ );
+        @list, @_;
     }); 
 }
 
@@ -220,8 +216,14 @@ sub map : method {
 
 sub grep : method {
     my ( $self, $fn ) = @_;
-    $self->then( sub {
-        grep { $fn->() } @_;
+    $self->map( sub {
+        my $bool = $fn->();
+        is_cv( $bool ) ?
+            $bool->then( sub { [ $_, shift ] } ) : 
+            [ $_, $bool ];
+    })->then( sub {
+        map { $_->[0] }
+            grep { $_->[1] } @_;
     });
 }
 
@@ -337,14 +339,14 @@ sub any {
     my $cv = AnyEventX::CondVar->new();
     my $done = ! is_cv( $other );
 
-    $self->then( sub {
-        $cv->send( @_ ) and $done = 1
+    $self->cb( sub {
+        $cv->send( shift->recv ) and $done = 1
             unless $done;
     });
 
     is_cv( $other ) ?
-        $other->then( sub {
-            $cv->send( @_ ) and $done = 1
+        $other->cb( sub {
+            $cv->send( shift->recv ) and $done = 1
                 unless $done;
         }) :
         $cv->send( $other );
@@ -364,7 +366,5 @@ sub wait {
     });
     $cv;
 }
-
-
 
 1;

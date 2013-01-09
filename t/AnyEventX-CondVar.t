@@ -339,7 +339,7 @@ is_deeply(
             ->pop_stash
             ->recv
     ],
-    [ 4, 8, 16 ],
+    [ 4, 8, 12 ],
     'Stash multi level'
 );
 
