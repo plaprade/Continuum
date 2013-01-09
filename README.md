@@ -29,6 +29,7 @@ have access to a database API `$db` that produces AnyEvent (old) and
 AnyEventX (new) condition variables. Here is how you would solve this
 problem traditionally:
 
+```perl
     use AnyEvent;
 
     sub get\_keys {
@@ -52,9 +53,11 @@ problem traditionally:
         $cv->end;
         $cv;
     }
+```
 
 And using the `AnyEventX::CondVar` approach:
 
+```perl
     use AnyEventX::CondVar;
 
     sub get\_keys {
@@ -62,6 +65,7 @@ And using the `AnyEventX::CondVar` approach:
             $\_ => $db->get( $\_ )
         });
     }
+```
 
 Power comes from conciseness, all other things being equal. The
 behavior of the first example is not immediately obvious. It requires
@@ -91,6 +95,7 @@ the realm of condition variables to describe data transformations.  It
 is somewhat wasteful to "peek" into condition variables and build
 new ones for simple transformations:
 
+```perl
     use AnyEvent;
 
     sub penguins {
@@ -103,15 +108,18 @@ new ones for simple transformations:
 
         $cv;
     }
+```
 
 The above example could be more concisely describe as follows:
 
+```perl
     use AnyEventX::CondVar;
 
     sub penguins {
         $db->get( 'zoo\_animals' )
             ->grep( sub { $\_->type eq 'penguin' } );
     }
+```
 
 Using the second form saves you from writing a lot of boilerplate code
 that can be automatically handled for you. Both examples above are
@@ -121,6 +129,7 @@ transformations such as `map`, `sort` and `reduce`.
 Something else you might be doing a lot when writing asynchronous code
 is performing parallel operations with merge-point callbacks:
 
+```perl
     use AnyEvent;
 
     my $cv = AnyEvent->condvar;
@@ -142,11 +151,13 @@ is performing parallel operations with merge-point callbacks:
     $cv->cb( sub {
         # Do stuff with roy and silo. Be gentle !
     });
+```
 
 We provide two powerful constructs for dealing with this problem:
 `cons` and `then` for concatenating condition variables and handling
 data dependencies:
 
+```perl
     use AnyEventX::CondVar;
 
     $db->get( 'roy' )
@@ -155,6 +166,7 @@ data dependencies:
             my ( $roy, $silo ) = @\_;
             # Do stuff with roy and silo. Be nice !
         });
+```
 
 From the example above, you notice that calls such as `cons` and
 `then` can be chained. This holds true for every method in this
@@ -168,17 +180,21 @@ In this library, they are provided by the `then` operation. From a
 `then` callback, you can return any value which will automatically
 become available to the next chained operation: 
 
+```perl
     $db->get( 'a' )
         ->then( sub { a => shift } )
         ->then( sub { my ( $key, $value ) = @\_ } );
+```
 
 You can also return a condition variable from a `then` callback. The
 internal value of the condition variable will be automatically
 available to the next chained operation:
 
+```perl
     $db->get( 'a' )
         ->then( sub { $db->get( 'b' ) } )
         ->then( sub { my $b = shift; } );
+```
 
 You can return multiple condition variables from a `then` callback.
 You can even mix them with regular values. `then` does the right
@@ -186,17 +202,21 @@ thing by making the regular values directly available to the next
 chained operation, together with the internal values of the condition
 variables:
 
+```perl
     $db->get( 'a' )
         ->then( sub { shift, $db->get( 'b' ) } )
         ->then( sub { my ( $a, $b ) = @\_ } );
+```
 
 This holds for most of the functions in the API. You can use `map` to
 transform values into a mix of regular variables and condition
 variables and chain it with `then` to fetch all the results:
 
+```perl
     cv( @keys )
         ->map( sub { $\_ => $db->get( $\_ ) } )
         ->then( sub { my %results = @\_ } );
+```
 
 `cv` is only a helper function to access the API if you don't have an
 initial condition variable. Note that in all of the examples above, we
