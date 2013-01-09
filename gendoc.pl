@@ -2,14 +2,20 @@
 use strict;
 use warnings;
 
-use File::Slurp;
+use Pod::Markdown;
 
-my $text = `pod2markdown < lib/AnyEventX/CondVar/Readme.pm`;
+my $parser = Pod::Markdown->new;
 
-my $l = '\n[ ]{4}[^\n]*';
-my $e = '\n[ ]*';
-$text =~ s/($l($l|$e)*$l\n)/\n```perl$1```\n/gs;
+open( IN, '<lib/AnyEventX/CondVar/Readme.pm' );
+open( OUT, '>README.md' );
 
-open( FH, '>README.md' );
-print FH $text;
-close( FH );
+$parser->parse_from_filehandle( \*IN );
+my $text = $parser->as_markdown;
+
+my ( $l, $e ) = ( '\n[ ]{4}[^\n]*', '\n[ ]*' );
+$text =~ s/($l(($l|$e)*$l)?\n)/\n```perl$1```\n/gs;
+
+print OUT $text;
+
+close( OUT );
+close( IN );

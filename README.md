@@ -32,8 +32,8 @@ problem traditionally:
 ```perl
     use AnyEvent;
 
-    sub get\_keys {
-        my @keys = @\_;
+    sub get_keys {
+        my @keys = @_;
 
         my %results
         my $cv = AnyEvent->condvar;
@@ -60,9 +60,9 @@ And using the `AnyEventX::CondVar` approach:
 ```perl
     use AnyEventX::CondVar;
 
-    sub get\_keys {
-        cv( @\_ )->map( sub { 
-            $\_ => $db->get( $\_ )
+    sub get_keys {
+        cv( @_ )->map( sub { 
+            $_ => $db->get( $_ )
         });
     }
 ```
@@ -101,9 +101,9 @@ new ones for simple transformations:
     sub penguins {
         my $cv = AnyEvent->condvar;
 
-        $db->get( 'zoo\_animals' )->cb( sub {
+        $db->get( 'zoo_animals' )->cb( sub {
             my @animals = shift->recv;
-            $cv->send( grep { $\_->type eq 'penguin' } @animals );
+            $cv->send( grep { $_->type eq 'penguin' } @animals );
         });
 
         $cv;
@@ -116,8 +116,8 @@ The above example could be more concisely describe as follows:
     use AnyEventX::CondVar;
 
     sub penguins {
-        $db->get( 'zoo\_animals' )
-            ->grep( sub { $\_->type eq 'penguin' } );
+        $db->get( 'zoo_animals' )
+            ->grep( sub { $_->type eq 'penguin' } );
     }
 ```
 
@@ -163,7 +163,7 @@ data dependencies:
     $db->get( 'roy' )
         ->cons( $db->get( 'silo' ) )
         ->then( sub {
-            my ( $roy, $silo ) = @\_;
+            my ( $roy, $silo ) = @_;
             # Do stuff with roy and silo. Be nice !
         });
 ```
@@ -183,7 +183,7 @@ become available to the next chained operation:
 ```perl
     $db->get( 'a' )
         ->then( sub { a => shift } )
-        ->then( sub { my ( $key, $value ) = @\_ } );
+        ->then( sub { my ( $key, $value ) = @_ } );
 ```
 
 You can also return a condition variable from a `then` callback. The
@@ -205,7 +205,7 @@ variables:
 ```perl
     $db->get( 'a' )
         ->then( sub { shift, $db->get( 'b' ) } )
-        ->then( sub { my ( $a, $b ) = @\_ } );
+        ->then( sub { my ( $a, $b ) = @_ } );
 ```
 
 This holds for most of the functions in the API. You can use `map` to
@@ -214,8 +214,8 @@ variables and chain it with `then` to fetch all the results:
 
 ```perl
     cv( @keys )
-        ->map( sub { $\_ => $db->get( $\_ ) } )
-        ->then( sub { my %results = @\_ } );
+        ->map( sub { $_ => $db->get( $_ ) } )
+        ->then( sub { my %results = @_ } );
 ```
 
 `cv` is only a helper function to access the API if you don't have an
@@ -241,9 +241,9 @@ You can also provide a fix by contributing to the project:
 We're glad you want to contribute! It's simple:
 
 - Fork the project
-- Create a branch `git checkout -b my\_branch`
+- Create a branch `git checkout -b my_branch`
 - Commit your changes `git commit -am 'comments'`
-- Push the branch `git push origin my\_branch`
+- Push the branch `git push origin my_branch`
 - Open a pull request
 
 ## Supporting
