@@ -9,7 +9,7 @@ AnyEventX-CondVar is a wrapper module around L<AnyEvent> condition
 variables. It's purpose is to provide a clean and readable API for
 manipulating condition variables. This is achieved by extending the
 L<AnyEvent::CondVar|AnyEvent> library with chainable transformations.
-It produces code with the following style:
+It produces asynchronous code with the following style:
 
     ping( 'host1' )->cons( ping( 'host2' ) )
         ->map( sub{ list_files( $_ ) } )

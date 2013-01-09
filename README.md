@@ -7,7 +7,7 @@ AnyEventX-CondVar is a wrapper module around [AnyEvent](http://search.cpan.org/p
 variables. It's purpose is to provide a clean and readable API for
 manipulating condition variables. This is achieved by extending the
 [AnyEvent::CondVar](http://search.cpan.org/perldoc?AnyEvent) library with chainable transformations.
-It produces code with the following style:
+It produces asynchronous code with the following style:
 
 ```perl
     ping( 'host1' )->cons( ping( 'host2' ) )
