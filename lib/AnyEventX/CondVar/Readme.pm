@@ -11,14 +11,14 @@ manipulating condition variables. This is achieved by extending the
 L<AnyEvent::CondVar|AnyEvent> library with chainable transformations.
 It produces code with the following style:
 
-    ping( 'host1' )->any( ping( 'host2' ) )
+    ping( 'host1' )->cons( ping( 'host2' ) )
+        ->map( sub{ list_files( $_ ) } )
+        ->map( sub{ fetch_file( $_ ) } )
+        ->grep( sub{ $_->size > 0 } )
         ->then( sub {
-            my $host = shift; 
-            cv( @files )->map( sub {
-                $host->get_file( $_ );
-            });
-        })
-        ->grep( sub { $_->size > 0 } );
+            my @files = @_;
+            # Work with @files ...
+        });
 
 Condition variables are promises of delivering results. They are used
 in asynchronous frameworks as an alternative to callbacks and for
