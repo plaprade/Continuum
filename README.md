@@ -6,7 +6,19 @@ the documentation as well !__
 AnyEventX-CondVar is a wrapper module around [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition
 variables. It's purpose is to provide a clean and readable API for
 manipulating condition variables. This is achieved by extending the
-[AnyEvent::CondVar](http://search.cpan.org/perldoc?AnyEvent) library with chain-able transformations.
+[AnyEvent::CondVar](http://search.cpan.org/perldoc?AnyEvent) library with chainable transformations.
+It produces code with the following style:
+
+```perl
+    ping( 'host1' )->any( ping( 'host2' ) )
+        ->then( sub {
+            my $host = shift; 
+            cv( @files )->map( sub {
+                $host->get_file( $_ );
+            });
+        })
+        ->grep( sub { $_->size > 0 } );
+```
 
 Condition variables are promises of delivering results. They are used
 in asynchronous frameworks as an alternative to callbacks and for
