@@ -32,7 +32,7 @@ sub cv_build(;&@) {
                     return;
                 };
 
-            is_anyevent_cv( $x ) and do {
+            ( is_anyevent_cv( $x ) || is_cv( $x ) ) && do {
                 $x->cb( sub {
                     defined $next ?
                         $next->( shift->recv ) :
@@ -54,8 +54,13 @@ sub cv_build(;&@) {
 sub cv_then(&@) { @_ }
 
 sub cv {
+    return $_[0] if is_cv( $_[0] );
     my $cv = AnyEventX::CondVar->new();
-    $cv->send( @_ );
+    is_anyevent_cv( $_[0] ) ?
+        $_[0]->cb( sub {
+            $cv->send( shift->recv );
+        }) : 
+        $cv->send( @_ );
     $cv;
 }
 

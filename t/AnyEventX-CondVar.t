@@ -429,6 +429,18 @@ is_deeply(
 ### Utility Operators ###
 
 is_deeply(
+    [ cv( anyevent_cv( 1, 2, 3 ) )->recv ],
+    [ 1, 2, 3 ],
+    'build cv from anyevent_cv'
+);
+
+is_deeply(
+    [ cv( cv( 1, 2, 3 ) )->recv ],
+    [ 1, 2, 3 ],
+    'build cv from cv'
+);
+
+is_deeply(
     [ cv_wait(0.1)->cons( cv( 1, 2 ) )->recv ],
     [ 1, 2 ],
     'cv_wait'
@@ -478,6 +490,18 @@ is_deeply(
     )->recv],
     [ 1, 4 ],
     'cv_build early return'
+);
+
+is_deeply(
+    [ ( cv_build { cv() } )->recv ],
+    [],
+    'cv_build empty cv'
+);
+
+is_deeply(
+    [ ( cv_build { cv( 1, 2 ) } )->recv ],
+    [ 1, 2 ],
+    'cv_build cv'
 );
 
 is_deeply(
@@ -533,12 +557,14 @@ is_deeply(
         } cv_then {
             $_->( @_, 4, 5 );
         } cv_then {
-            cv_result( @_, 6 );
+            cv( @_, 6 );
         } cv_then {
-            ( @_, 7 );
+            cv_result( @_, 7 );
+        } cv_then {
+            ( @_, 8 );
         }
     )->recv],
-    [ 1, 2, 3, 4, 5, 6 ],
+    [ 1, 2, 3, 4, 5, 6, 7 ],
     'cv_build chain mix'
 );
 
