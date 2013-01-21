@@ -280,15 +280,14 @@ sub mul {
 
 sub and : method {
     my ( $self, $cb ) = @_;
-    $self->first->then( sub {
+    $self->then( sub {
         $_[0] ? $cb->( @_ ) : @_;
     });
 }
 
 sub or : method {
     my ( $self, $cb ) = @_;
-    $self->first->then( sub {
-        my ( $x, @xs ) = @_;
+    $self->then( sub {
         $_[0] ? @_ : $cb->( @_ );
     });
 }
