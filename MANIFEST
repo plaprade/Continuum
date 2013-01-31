@@ -1,7 +1,7 @@
 Changes
 Makefile.PL
 MANIFEST
-LICENSE
+UNLICENSE
 t/AnyEventX-CondVar.t
 lib/AnyEventX/CondVar.pm
 lib/AnyEventX/CondVar/Util.pm
