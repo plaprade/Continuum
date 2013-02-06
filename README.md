@@ -1,7 +1,7 @@
 ## Continuum - A continuation framework for Mojo & AnyEvent
 
 Continuum is a continuation framework that attempts to bring a bit of
-sanity and fun into your asynchronous programming. We try to both
+sanity and fun into asynchronous programming. We try to both
 improve the readability of your code and decrease the level of
 callback embedding that usually comes with asynchronous code. 
 
@@ -10,27 +10,28 @@ specifically the [AnyEvent::CondVar](http://search.cpan.org/perldoc?AnyEvent) co
 you're not yet familiar with AnyEvent, it's a good time to get
 acquainted! Understanding condition variables is essential to using
 this module efficiently. However, we provide a different analogy to
-the dryer condition variable semantics: we'll use portals! Yes, just
-like the Stargate portals.
+the _boring_ condition variable semantics: we'll talk about Portals!
+Yes, just like the Stargate Portals.
 
 There are two schools of asynchronous programming styles in Perl.
-Either you require the user to provide a callback that will be called
-once the results are available, or you can give the user a promise of
-delivering a result sometime in the future. In the [AnyEvent](http://search.cpan.org/perldoc?AnyEvent)
-framework, this promise is a condition variable. In Continuum, we call
-them Portals. Essentially, if someone wants to do an asynchronous
-database call, we hand them a portal and we promise that the database
-results will come out of that portal once they are ready. 
+Either you require the user to provide a callback that will be
+triggered once the results are available, or you can give the user a
+promise of delivering the results some time in the future. In the
+[AnyEvent](http://search.cpan.org/perldoc?AnyEvent) framework, this promise is a condition variable. In
+Continuum, we call them Portals. Essentially, if someone wants to do
+an asynchronous database call, we hand them a Portal and we promise
+that the database results will come out of that Portal once they are
+ready. 
 
 Aside from the different naming conventions, the power of Continuum
-comes from it's portal manipulation API. We make it easy to connect
-portals, apply various functions to portals and handle the portal
-results once they are available. Because portals are very similar to
-condition variables, Continuum also makes it easier to work with them.
-Let's work our way through an example to understand the differences
-and benefits of AnyEvent and Continuum. Let's assume we have access to
-an asynchronous `$fleet` API that returns AnyEvent condition
-variables.
+comes from it's Portal manipulation API. We make it easy to connect
+Portals, apply various functions to Portals and handle the Portal
+results once they are available. Because Portals are essentially
+glorified condition variables, Continuum also makes it easier to work
+with them. Let's see our way through an example to understand the
+differences and advantages of Continuum. Let's assume we have access
+to an asynchronous `$fleet` API that returns [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition
+variables:
 
 ```perl
     use AnyEvent;
@@ -71,14 +72,14 @@ all the fleet ships are assembled and will call `send` on your
 condition variable. Then you loop over all of your ships, setting
 non-blocking callbacks with the proper `begin` and `end` calls to
 increment and decrement the condition variables internal counter. You
-give this condition variable to the caller who will wait for the fleet
+give this condition variable to the caller who can wait for the fleet
 to assemble in a blocking or non-blocking way.
 
-According to us, there are a few problems with this approach:
+Our humbly believe there are a few problems with this approach:
 essentially code readability and execution flow. It is not immediately
-clear how this code works and when different blocks of code execute.
+obvious how this code works and when different blocks of code execute.
 The order of execution is confusing. This might be fine for small
-projects but becomes rapidly unmaintainable for non-trivial projects.
+projects but becomes rapidly unmaintainable for non-trivial code bases.
 Continuum allows you to rewrite the above example in a functionally
 equivalent manner as:
 
@@ -99,57 +100,74 @@ equivalent manner as:
     });
 ```
 
-We use `append` in the example above, which is one of multiple
-functions available in the portal API. `append` essentially acts as a
-merge-point for portals or condition variables. It builds a new portal
-that will trigger only once all the input portal values are available.
-In our case, `append` creates a new portal out of which the
-Millennium Falcon, the USS Enterprise and the Destiny will fly out at
-the same time once they have been found. 
+Much shorter and (hopefully) easier to understand.
 
-Now, let's assume our `$fleet` API is portal-enabled and returns
-portals for all of its calls. We could selectively find individual
+We use `append` in this example, which is one of multiple functions
+available in the Portal API. Append essentially acts as a merge-point
+for Portals and condition variables. It builds a new Portal that will
+trigger only once all the input Portal values are available.  In this
+case, append creates a new Portal that will deliver the Millennium
+Falcon, the USS Enterprise and the Destiny once all of them are
+available.
+
+Now, let's assume our `$fleet` API is Portal-enabled and returns
+Portals for all of its calls. We could selectively find individual
 ships:
 
 ```perl
-    $fleet->find( 'Millennium Falcon' ) =
+    $fleet->find( 'Millennium Falcon' ) 
         ->cons( $fleet->find( 'USS Enterprise' ) )
         ->then( sub {
             my @ships = @_;
         });
 ```
 
-`cons` essentially creates a new portal that concatenates the values
-of two portals. It will trigger once both input portal values are
-available. This is similar to `append`. In fact, `append` is
-implemented using `cons`. It is important to notice that all the
-calls to `append` and `cons` happen in parallel.
+`cons` essentially creates a new Portal that will deliver the result
+of it's two input Portals when both of them are ready. It concatenates
+both results into a list. This is similar to `append`. In fact,
+append is implemented using cons. It is also interesting to note that
+all Portals passed to cons or append execute in parallel.
 
-`then` allows you to set a function to process the results of the
-previous portal once they are available. When both the Millennium
-Falcon and the USS Enterprise are found, they can be processed in
-`then`. It will also return a new portal containing the
-transformations applied to the ships.
+`then` is used when you have data dependencies between different
+asynchronous calls. It is probably the most important function of the
+Continuum API. You can apply arbitrary transformations to the results
+of any Portal by chaining a `then` call. The function provided in
+`then` will only be called when the results from the Portal are
+available, instead of running in parallel. It is the primary way of
+defining continuations in Continuum. 
 
-When you are working with Continuum, you are chaining portals
-together. Once something comes out of the first portal, it will go
-through your portal chain and come out transformed from the last
-portal in your chain. Another analogy for Continuum is that you are
-applying transformation to future values. Applying a transformation to
-a portal is essentially equivalent to applying the same transformation
-to the value that will come out of the portal sometime in the future.
-The portal only stores the transformation until it can be applied to
-the value coming out of the portal.
+`then` will create a new Portal, like every other call in the
+Continuum API (this allows for chaining calls). The Portal will
+eventually return the value returned by the `then` function. If you
+return a Portal or a condition variable from within your function, it
+will be linked to the outer Portal created by `then`.
+
+When you are playing with Continuum, you are chaining Portals together
+using transformations. Every call to the Portal API creates a new
+Portal returning a transformation of the previous Portals results.
+When something actually comes out of the first Portal in your chain,
+all the transformations that you have created will be applied and the
+final result will come out of the last Portal in your chain. As far as
+your users are concerned, if you only give them the last Portal in
+your chain, the rest is completely abstracted and equivalent to a
+black box.
+
+A different analogy for Continuum is that you are applying
+transformation to future values. Applying a transformation to a Portal
+is essentially equivalent to applying the same transformation to the
+value that will come out of the Portal some time in the future.  The
+Portal only stores the transformation until it can be applied to the
+value coming out of the Portal.
 
 ## Extended examples
 
 Let's build on top of the previous example and create a function that
 can repair a ship. It needs to find the ship, repair it and put it
 back into the fleet. These 3 actions are provided by the `$fleet` API
-which is portal-enabled.
+which is Portal-enabled.
 
 ```perl
-    # Returns a portal
+    # Returns a Portal
     sub find_and_repair {
         my $ship = shift;
         $fleet->find( $ship )
@@ -158,13 +176,13 @@ which is portal-enabled.
     }
 ```
 
-We have a data dependency between the 3 asynchronous operations find,
-repair and put. They can not be processed in parallel. We use the
-`then` keyword to chain transformations to our data when there are
-data dependencies (i.e. we can only repair a ship once we found it). 
+We have data dependencies between our 3 asynchronous operations and
+can not process them in parallel (we actually need to find a ship
+before we can start the repair work). Using `then`, we chain the
+necessary transformations to our ship.
 
-There is however no data dependency between repairing two distinct
-ships. We can essentially repair them in parallel:
+Nothing prevents us, however, from finding and repairing two ships in
+parallel:
 
 ```perl
     find_and_repair( 'Millennium Falcon' )
@@ -185,11 +203,12 @@ We can even repair a whole fleet of ships in parallel:
         });
 ```
 
-You use `cons` to concatenate one value or portal. You use `append`
-if you need to append a list of values or portals. 
+`cons` and `append` are similar in function. You use cons when you
+want to process two Portals in parallel. You use append when you have
+a list of Portals to process in parallel. 
 
 We could also have implemented the find and repair algorithm
-differently, using the `map` function of the portal API:
+differently, using the `map` function from the Portal API:
 
 ```perl
     sub find_and_repair {
@@ -202,22 +221,22 @@ differently, using the `map` function of the portal API:
     }
 ```
 
-We start by creating a new portal containing all the ships. Then we
-map them through 3 portals that finds the ships, repairs them and puts
-them back into the fleet. The difference here is that the find, repair
-and put steps happen in batch: first we find all the ships in
-parallel, then we repair them all in parallel, then we put them back
-into the fleet in parallel. In our first example, the find => repair
-=> put pipeline was independent for every ship.
+We start by creating a new Portal containing all the ships. Then we
+map them through 3 Portals that respectively finds the ships, repairs
+them and puts them back into the fleet. The difference here is that
+the find, repair and put are batch operations. First we find all
+the ships in parallel, then we repair them all in parallel, then we
+put them back into the fleet in parallel. In our first example, the
+find => repair => put pipeline was independent for every ship.
 
-## From callbacks to portals
+## From callbacks to Portals
 
 We didn't explain the `portal` keyword yet. It allows us to create a
-new portal from scratch. We used it up until now to create an empty
-portal when we didn't have a prior portal, to access the portal API.
+new Portal from scratch. We used it up until now to create an empty
+Portal when we didn't have a prior Portal to access the Portal API.
 `portal` is actually much more powerful, as it allows us to create
-portals from a chain of arbitrary callbacks. This is very useful when
-you need to map a callback-oriented API to a portal API. Let's
+Portals from a chain of arbitrary callbacks. This is very useful when
+you need to map a callback-oriented API to a Portal API. Let's
 demonstrate.
 
 Assume we have an asynchronous callback-oriented `$db` API.
@@ -235,21 +254,22 @@ Assume we have an asynchronous callback-oriented `$db` API.
     }; 
 ```
 
-Portal takes a list of functions as argument. We have a very neat
-syntax for you to create portals with function lists using the
-`continuum` keyword. In every function, you are either expected to
-call `$jump` to go to the next function in the chain, or return a
-portal ( or AnyEvent condition variable ) which will trigger the next
-function when the results are available. 
+`portal` takes a list of functions as argument. We have a very neat
+syntax to create Portals with the `continuum` keyword. Every
+`continuum` simply declares a new function. In every function, you
+are either expected to call `$jump` to go to the next function in the
+chain, or return a Portal ( or [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition variable ) which
+will trigger the next function when the results are available. 
 
-The `portal` call will immediately return a portal. The value that
-will come out of the portal is the return value of your last function
-in the chain. The above example is a trivial one-to-one mapping from a
-callback API to a portal call. It is usually more interesting to write
-application specific portals from a callback API. We might want to
-create a portal that finds all the repair-class ships in our fleet and
-command them to repair all the damaged ships. We assume the `$fleet`
-API is an asynchronous callback-oriented framework.
+The `Portal` call will immediately return a Portal to the user. The
+value that will come out of the Portal is the return value of your
+last function in the chain. The above example is a trivial one-to-one
+mapping from a callback API to a Portal. It is usually more
+interesting to write application specific Portals from a callback API.
+We might want to create a Portal that finds all the repair-class ships
+in our fleet and command them to repair all the damaged ships. Let's
+assume the `$fleet` API is an asynchronous callback-oriented
+framework.
 
 ```perl
     use Continuum;
@@ -274,8 +294,8 @@ API is an asynchronous callback-oriented framework.
     }
 ```
 
-Now, with this portal function, we have access to the whole portal
-API. If we have multiple fleets to repair in parallel, it's simple:
+Now, with this Portal at our disposial, we can repair multiple fleets
+in parallel!
 
 ```perl
     repair_fleet( $alpha_fleet )
@@ -288,9 +308,9 @@ API. If we have multiple fleets to repair in parallel, it's simple:
 
 ## Learn more about Portals
 
-You can write most of your portal code using the techniques described
+You can write most of your Portal code using the techniques described
 in this tutorial. There are however a lot more functions available in
-the portal API. Feel free to head to the wiki for additional
+the Portal API. Feel free to head to the wiki for additional
 documentation.
 
 ( TODO ... )
