@@ -1,4 +1,4 @@
-## AnyEventX-CondVar
+## Continuum - Continuation framework for Mojolicious/AnyEvent
 
 __! This module is work in progress. The code is likely to change. And
 the documentation as well !__

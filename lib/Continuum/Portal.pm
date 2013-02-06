@@ -1,19 +1,16 @@
-package AnyEventX::CondVar;
+package Continuum::Portal;
 
 use strict;
 use warnings;
 
 use AnyEvent;
-use AnyEventX::CondVar::Util qw( :all );
 use List::Util;
 use Carp;
-require Exporter;
-
-use version; our $VERSION = version->declare("v0.0.2"); 
+use Continuum::Util;
 
 our @ISA = qw( AnyEvent::CondVar );
 
-#    All Perl operators:
+#    All Perl operators ( for reference ):
 #
 #    with_assign => [ qw( + - * / % ** << >> x . ) ],
 #    assign => [ qw( += -= *= /= %= **= <<= >>= x= .= ) ],
@@ -49,15 +46,15 @@ use overload (
         ) ),
     (
         '""' => sub {
-            croak "Can't stringify AnyEventX::CondVar. You probably "
+            croak "Can't stringify Continuum::Portal. You probably "
                 . "want to call ->recv or ->cb to read the value."
         },
         '0+' => sub {
-            croak "Can't numify AnyEventX::CondVar. You probably "
+            croak "Can't numify Continuum::Portal. You probably "
                 . "want to call ->recv or ->cb to read the value."
         },
         'bool' => sub {
-            croak "Can't boolify AnyEventX::CondVar. You probably "
+            croak "Can't boolify Continuum::Portal. You probably "
                 . "want to call ->recv or ->cb to read the value."
         },
     ),
@@ -67,7 +64,7 @@ use overload (
 
 =head1 NAME
 
-AnyEventX::CondVar - Asynchronous continuation framework for Perl
+Continuum::Portal - Asynchronous continuation framework for Perl
 
 =cut
 
@@ -76,9 +73,7 @@ AnyEventX::CondVar - Asynchronous continuation framework for Perl
 sub _op2 {
     my ( $op, $self, $other, $swap ) = @_;
 
-    $self->first->cons(
-        is_cv( $other ) ? $other->first : $other 
-    )->then( sub {
+    $self->cons( $other )->then( sub {
         my ( $a, $b ) = @_;
         my $stm = $swap ?
             '$b ' . $op . ' $a' :
@@ -92,7 +87,7 @@ sub _op2 {
 sub _op1 {
     my ( $op, $self ) = @_;
 
-    $self->first->then( sub {
+    $self->then( sub {
         my $a = shift;
         my $stm = $op . '$a';
         my $res = eval( $stm ); 
@@ -105,16 +100,16 @@ sub _op1 {
 
 sub cons {
     my ( $self, $other ) = @_;
-    my $cv = AnyEventX::CondVar->new();
+    my $portal = Continuum::Portal->new;
     $self->cb( sub {
         my @left = shift->recv;
-        is_cv( $other ) ?
+        is_portal( $other ) ?
             $other->cb( sub {
-                $cv->send( @left, shift->recv );
+                $portal->send( @left, shift->recv );
             }) :
-            $cv->send( @left, $other );
+            $portal->send( @left, $other );
     });
-    $cv;
+    $portal;
 }
 
 sub append {
@@ -127,21 +122,21 @@ sub append {
 
 sub then {
     my ( $self, $cb ) = @_;
-    my $cv = AnyEventX::CondVar->new();
+    my $portal = Continuum::Portal->new;
     $self->cb( sub {
-        my @res = $cb->( shift->recv );
-        cv->append( @res )->cb( sub {
-            $cv->send( shift->recv );
+        my $inner = Continuum::Portal->new; 
+        $inner->send();
+        $inner->append( $cb->( shift->recv ) )->cb( sub {
+            $portal->send( shift->recv );
         });
     });
-    $cv;
+    $portal;
 }
 
 ### List operations ###
 
 sub push : method {
-    my ( $self, @list ) = @_;
-    $self->append( @list );
+    shift->append( @_ );
 }
 
 sub pop : method {
@@ -150,9 +145,7 @@ sub pop : method {
 
 sub unshift : method {
     my ( $self, @list ) = @_;
-    $self->then( sub { 
-        @list, @_;
-    }); 
+    $self->then( sub { @list, @_ } ); 
 }
 
 sub shift : method {
@@ -217,10 +210,11 @@ sub map : method {
 sub grep : method {
     my ( $self, $fn ) = @_;
     $self->map( sub {
-        my $bool = $fn->();
-        is_cv( $bool ) ?
-            $bool->then( sub { [ $_, shift ] } ) : 
-            [ $_, $bool ];
+        my $portal = Continuum::Portal->new;
+        $portal->send();
+        $portal->cons( $fn->() )->then( sub {
+            [ $_, shift ]
+        });
     })->then( sub {
         map { $_->[0] }
             grep { $_->[1] } @_;
@@ -235,7 +229,7 @@ sub sort : method {
     $self->then( sub {
         no strict 'refs';
         defined $fn ? sort { 
-                $caller ne 'AnyEventX::CondVar'
+                $caller ne 'Continuum::Portal'
                     and local( *{ $caller . '::a' } ) = \$a
                     and local( *{ $caller . '::b' } ) = \$b;
                 $fn->(); 
@@ -251,7 +245,7 @@ sub reduce : method {
     $self->then( sub {
         no strict 'refs';
         List::Util::reduce { 
-            $caller ne 'AnyEventX::CondVar'
+            $caller ne 'Continuum::Portal'
                 and local( *{ $caller . '::a' } ) = \$a
                 and local( *{ $caller . '::b' } ) = \$b;
             $fn->();
@@ -313,7 +307,6 @@ sub pop_stash {
 
 ### MISC Operators ###
 
-# TODO : NAMING ?? USEFULL ??
 sub deref {
     my $self = shift;
     $self->then( sub {
@@ -326,8 +319,7 @@ sub deref {
     });
 }
 
-# TODO: NAMING ??!?!?
-sub result {
+sub shadow {
     my ( $self, @args ) = @_;
     $self->then( sub { @args } );
 }
@@ -335,35 +327,42 @@ sub result {
 sub any {
     my ( $self, $other ) = @_;
 
-    my $cv = AnyEventX::CondVar->new();
-    my $done = ! is_cv( $other );
+    my $portal = Continuum::Portal->new;
+    my $pending = is_portal( $other );
 
     $self->cb( sub {
-        $cv->send( shift->recv ) and $done = 1
-            unless $done;
+        if( $pending ) {
+            $portal->send( shift->recv );
+            $pending = 0;
+        }
     });
 
-    is_cv( $other ) ?
+    is_portal( $other ) ?
         $other->cb( sub {
-            $cv->send( shift->recv ) and $done = 1
-                unless $done;
-        }) :
-        $cv->send( $other );
+            if( $pending ){
+                $portal->send( shift->recv );
+                $pending = 0;
+            }
+        }) : $portal->send( $other );
 
-    $cv;
+    $portal;
 }
 
 sub wait {
     my ( $self, $time ) = @_;
-    my $cv = AnyEventX::CondVar->new();
+
+    my $portal = Continuum::Portal->new;
+
     $self->cb( sub {
         my @args = shift->recv;
         my $t; $t = AnyEvent->timer( after => $time, cb => sub {
             undef $t;
-            $cv->send( @args );
+            $portal->send( @args );
         });
     });
-    $cv;
+
+    $portal;
 }
 
 1;
+

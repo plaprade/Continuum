@@ -2,7 +2,6 @@ Changes
 Makefile.PL
 MANIFEST
 UNLICENSE
-t/AnyEventX-CondVar.t
-lib/AnyEventX/CondVar.pm
-lib/AnyEventX/CondVar/Util.pm
-lib/AnyEventX/CondVar/Readme.pm
+t/Continuum.t
+lib/Continuum.pm
+lib/Continuum/Portal.pm

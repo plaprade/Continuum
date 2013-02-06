@@ -6,7 +6,7 @@ use Pod::Markdown;
 
 my $parser = Pod::Markdown->new;
 
-open( IN, '<lib/AnyEventX/CondVar/Readme.pm' );
+open( IN, '<lib/Continuum.pm' );
 open( OUT, '>README.md' );
 
 $parser->parse_from_filehandle( \*IN );

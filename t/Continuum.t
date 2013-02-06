@@ -5,8 +5,8 @@ use AnyEvent;
 use Test::More; 
 use Data::Dumper;
 
-BEGIN { use_ok( 'AnyEventX::CondVar' ) };
-BEGIN { use_ok( 'AnyEventX::CondVar::Util', qw( :all ) ) };
+BEGIN { use_ok( 'Continuum' ) };
+use Continuum;
 
 test_num( 0, 0 );
 test_num( 0, 1 );
@@ -368,34 +368,34 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv(1, 2)->result( 3, 4 )->cons( 5 )->recv ],
+    [ cv(1, 2)->shadow( 3, 4 )->cons( 5 )->recv ],
     [ 3, 4, 5 ],
-    'Result scalar'
+    'Shadow scalar'
 );
 
 is_deeply(
-    [ cv(1, 2)->result( cv( 3, 4 ) )->cons( 5 )->recv ],
+    [ cv(1, 2)->shadow( cv( 3, 4 ) )->cons( 5 )->recv ],
     [ 3, 4, 5 ],
-    'Result condvar'
+    'Shadow condvar'
 );
 
 is_deeply(
-    [ cv_wait( 0.1 )->then( sub { cv( 3, 4, ) } )
-        ->wait( 0.1 )->result( cv( 1, 2 ) )->recv ],
+    [ portal->wait( 0.1 )->then( sub { cv( 3, 4, ) } )
+        ->wait( 0.1 )->shadow( cv( 1, 2 ) )->recv ],
     [ 1, 2 ],
-    'Result wait'
+    'Shadow wait'
 );
 
 is_deeply(
-    [ ( cv_build { 
+    [ ( portal { 
         my $cv = AnyEvent->condvar; 
         my $w; $w = AnyEvent->timer( after => 0.05, cb => sub {
             undef $w;
             $cv->send( 1, 2 );
         });
         $cv;
-    } )->result( 
-        cv_build {
+    } )->shadow( 
+        portal {
             my $cv = AnyEvent->condvar; 
             my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
                 undef $w;
@@ -405,7 +405,7 @@ is_deeply(
         }
     )->recv ],
     [ 3, 4 ],
-    'Result build wait'
+    'Shadow portal wait'
 );
 
 is_deeply(
@@ -429,149 +429,137 @@ is_deeply(
 ### Utility Operators ###
 
 is_deeply(
-    [ cv( anyevent_cv( 1, 2, 3 ) )->recv ],
-    [ 1, 2, 3 ],
-    'build cv from anyevent_cv'
-);
-
-is_deeply(
-    [ cv( cv( 1, 2, 3 ) )->recv ],
-    [ 1, 2, 3 ],
-    'build cv from cv'
-);
-
-is_deeply(
-    [ cv_wait(0.1)->cons( cv( 1, 2 ) )->recv ],
-    [ 1, 2 ],
-    'cv_wait'
-);
-
-is_deeply(
-    [ cv_build->recv ],
+    [ portal->recv ],
     [],
-    'cv_build empty'
+    'portal empty'
 );
 
 is_deeply(
-    [ ( cv_build { 2 } )->recv ],
+    [ ( portal { 2 } )->recv ],
     [ 2 ],
-    'cv_build single scalar'
+    'portal single scalar'
 );
 
 is_deeply(
-    [ ( cv_build { cv_result(2) } )->recv ],
+    [ ( portal { break_continuum(2) } )->recv ],
     [ 2 ],
-    'cv_build single result'
+    'portal single result'
 );
 
 is_deeply(
     [( 
-        cv_build { 
-            $_->(1); 
-        } cv_then {
-            $_->( @_, 2 );
-        } cv_then {
+        portal { 
+            $jump->(1); 
+        } continuum {
+            $jump->( @_, 2 );
+        } continuum {
             ( @_, 3 );
         }
     )->recv],
     [ 1, 2, 3 ],
-    'cv_build chain'
+    'portal chain'
 );
 
 is_deeply(
     [( 
-        cv_build { 
-            $_->(1); 
-        } cv_then {
-            cv_result( @_, 4 );
-        } cv_then {
+        portal { 
+            $jump->(1); 
+        } continuum {
+            break_continuum( @_, 4 );
+        } continuum {
             ( @_, 3 );
         }
     )->recv],
     [ 1, 4 ],
-    'cv_build early return'
+    'portal early return'
 );
 
 is_deeply(
-    [ ( cv_build { cv() } )->recv ],
+    [ ( portal { cv() } )->recv ],
     [],
-    'cv_build empty cv'
+    'portal empty cv'
 );
 
 is_deeply(
-    [ ( cv_build { cv( 1, 2 ) } )->recv ],
+    [ ( portal { cv( 1, 2 ) } )->recv ],
     [ 1, 2 ],
-    'cv_build cv'
+    'portal cv'
 );
 
 is_deeply(
-    [( cv_build { anyevent_cv() } )->recv],
+    [( portal { anyevent_cv() } )->recv],
     [],
-    'cv_build empty anyevent'
+    'portal empty anyevent'
 );
 
 is_deeply(
-    [( cv_build { anyevent_cv( 2 ) } )->recv],
+    [( portal { anyevent_cv( 2 ) } )->recv],
     [ 2 ],
-    'cv_build simple anyevent'
+    'portal simple anyevent'
 );
 
 is_deeply(
-    [( cv_build { anyevent_cv( 1, 2, 3 ) } )->recv],
+    [( portal { anyevent_cv( 1, 2, 3 ) } )->recv],
     [ 1, 2, 3 ],
-    'cv_build list anyevent'
+    'portal list anyevent'
 );
 
 is_deeply(
     [( 
-        cv_build { 
+        portal { 
             anyevent_cv( 1, 2, 3 ) 
-        } cv_then {
+        } continuum {
             anyevent_cv( @_, 4, 5, 6 ) 
-        } cv_then {
+        } continuum {
             ( @_, 7 );
         }
     )->recv],
     [ 1, 2, 3, 4, 5, 6, 7 ],
-    'cv_build chain anyevent'
+    'portal chain anyevent'
 );
 
 is_deeply(
     [( 
-        cv_build { 
+        portal { 
             anyevent_cv( 1, 2, 3 ) 
-        } cv_then {
-            cv_result( @_, 4, 5 );
-        } cv_then {
+        } continuum {
+            break_continuum( @_, 4, 5 );
+        } continuum {
             ( @_, 7 );
         }
     )->recv],
     [ 1, 2, 3, 4, 5 ],
-    'cv_build chain anyevent early return'
+    'portal chain anyevent early return'
 );
 
 is_deeply(
     [( 
-        cv_build { 
+        portal { 
             anyevent_cv( 1, 2, 3 ) 
-        } cv_then {
-            $_->( @_, 4, 5 );
-        } cv_then {
+        } continuum {
+            $jump->( @_, 4, 5 );
+        } continuum {
             cv( @_, 6 );
-        } cv_then {
-            cv_result( @_, 7 );
-        } cv_then {
+        } continuum {
+            break_continuum( @_, 7 );
+        } continuum {
             ( @_, 8 );
         }
     )->recv],
     [ 1, 2, 3, 4, 5, 6, 7 ],
-    'cv_build chain mix'
+    'portal chain mix'
 );
 
 done_testing();
 
 sub anyevent_cv {
     my $cv = AnyEvent->condvar;
+    $cv->send( @_ );
+    $cv;
+}
+
+sub cv {
+    my $cv = Continuum::Portal->new;
     $cv->send( @_ );
     $cv;
 }

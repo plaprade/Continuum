@@ -1,6 +1,107 @@
-= pod 
+package Continuum;
 
-=head2 AnyEventX-CondVar
+use strict;
+use warnings;
+
+use Scalar::Util qw( blessed );
+use Continuum::Portal;
+use Continuum::Util;
+
+use version; our $VERSION = version->declare("v0.0.3"); 
+
+use base 'Exporter';
+
+our @EXPORT = (qw(
+    portal
+    continuum
+    break_continuum
+    $jump
+));
+
+our $jump;
+
+# Build a Continuum::Portal from a chain of callbacks (continuums)
+sub portal(;&@) {
+
+    my $portal = Continuum::Portal->new();
+    my $fp = undef;
+    my $caller = caller;
+
+    # Traverse the function list backward and link them together
+    foreach my $f ( reverse @_ ) {
+        my $next = $fp; $fp = sub {
+
+            no strict 'refs';
+
+            # Localize $jump into the caller's namespace
+            local( *{ $caller . '::jump' } ) = \$next;
+
+            my ( $x, @xs ) = $f->( @_ );
+
+            # Break the function chain early with 
+            # a break_continuum() call
+            broken_continuum( $x ) and do {
+                $portal->send( $x->value );
+                return;
+            };
+
+            # If a function return a portal, connect it to the next
+            # function (continuum)
+            is_portal( $x ) and do {
+                $x->cb( sub {
+                    defined $next ?
+                        $next->( shift->recv ) :
+                        $portal->send( shift->recv );
+                });
+                return;
+            };
+
+            # If no portal is provided by a function in the chain,
+            # the user is expected to call $jump manually to make
+            # it to the next function. If we are at the end of the
+            # function chain, the portal is triggered and returned
+            $portal->send( $x, @xs )
+                unless defined $next;
+        };
+    }
+
+    # Allow the creation of an empty portal. This will simply
+    # trigger the portal and return it
+    defined $fp ?
+        $fp->() :
+        $portal->send();
+
+    $portal;
+}
+
+sub continuum(&@) { @_ }
+
+sub break_continuum {
+    Continuum::Broken->new( @_ );
+}
+
+package Continuum::Broken;
+
+sub new {
+    my $class = shift;
+    my $self = {
+        _value => [ @_ ],
+    };
+    bless $self, $class;
+}
+
+sub value {
+    my $self = shift;
+    wantarray ? 
+        @{ $self->{ _value } } : 
+        $self->{ _value }->[0];
+}
+
+1;
+
+__END__
+
+=head2 Continuum - Continuation framework for Mojolicious/AnyEvent
 
 B<! This module is work in progress. The code is likely to change. And
 the documentation as well !>
@@ -284,5 +385,3 @@ L<Bitcoins|http://www.weusecoins.com/> to:
 B<17YWBJUHaiLjZWaCyPwcV8CJDpfoFzc8Gi>
 
 =cut
-
-
