@@ -101,256 +101,288 @@ sub value {
 
 __END__
 
-=head2 Continuum - Continuation framework for Mojolicious/AnyEvent
+=head2 Continuum - A continuation framework for Mojo & AnyEvent
 
-B<! This module is work in progress. The code is likely to change. And
-the documentation as well !>
+Continuum is a continuation framework that attempts to bring a bit of
+sanity and fun into your asynchronous programming. We try to both
+improve the readability of your code and decrease the level of
+callback embedding that usually comes with asynchronous code. 
 
-AnyEventX-CondVar is a wrapper module around L<AnyEvent> condition
-variables. It's purpose is to provide a clean and readable API for
-manipulating condition variables. This is achieved by extending the
-L<AnyEvent::CondVar|AnyEvent> library with chainable transformations.
-It produces asynchronous code with the following style:
+Continuum is built on top of the L<AnyEvent> framework, more
+specifically the L<AnyEvent::CondVar|AnyEvent> condition variables. If
+you're not yet familiar with AnyEvent, it's a good time to get
+acquainted! Understanding condition variables is essential to using
+this module efficiently. However, we provide a different analogy to
+the dryer condition variable semantics: we'll use portals! Yes, just
+like the Stargate portals.
 
-    # ping, list_files and fetch_file produce condition variables
-    ping( 'host1' )->cons( ping( 'host2' ) )
-        ->map( sub{ list_files( $_ ) } )
-        ->map( sub{ fetch_file( $_ ) } )
-        ->grep( sub{ $_->size > 0 } )
-        ->then( sub {
-            my @files = @_;
-            # Work with @files ...
-        });
+There are two schools of asynchronous programming styles in Perl.
+Either you require the user to provide a callback that will be called
+once the results are available, or you can give the user a promise of
+delivering a result sometime in the future. In the L<AnyEvent>
+framework, this promise is a condition variable. In Continuum, we call
+them Portals. Essentially, if someone wants to do an asynchronous
+database call, we hand them a portal and we promise that the database
+results will come out of that portal once they are ready. 
 
-Condition variables are promises of delivering results. They are used
-in asynchronous frameworks as an alternative to callbacks and for
-synchronizing parallel execution flows. I recommend reading the
-L<AnyEvent> documentation on condition variables if you are not
-already familiar with them.
-
-Returning condition variables from asynchronous API's is generally
-more flexible than requiring callbacks as users can decide to block
-or not on API calls. The downside of building complex operations with
-condition variables is code readability. It's easy to end up with
-embedded callback code and spaghetti flows of execution. This library
-is an attempt at solving these issues and make asynchronous
-programming in Perl fun. I hope you find it useful!
-
-Let's start with an example. Given a list of C<@keys>, we want to
-retrieve the database values for each key in parallel and return the
-result as a C<%hash> ( in a condition variable ).  Let's assume we
-have access to a database API C<$db> that produces AnyEvent (old) and
-AnyEventX (new) condition variables. Here is how you would solve this
-problem traditionally:
+Aside from the different naming conventions, the power of Continuum
+comes from it's portal manipulation API. We make it easy to connect
+portals, apply various functions to portals and handle the portal
+results once they are available. Because portals are very similar to
+condition variables, Continuum also makes it easier to work with them.
+Let's work our way through an example to understand the differences
+and benefits of AnyEvent and Continuum. Let's assume we have access to
+an asynchronous C<$fleet> API that returns AnyEvent condition
+variables.
 
     use AnyEvent;
 
-    sub get_keys {
-        my @keys = @_;
-
-        my %results
+    sub assemble_squad {
+        my %squad;
         my $cv = AnyEvent->condvar;
 
         $cv->begin( sub {
-            shift->send( %results );
+            shift->send( %squad );
         });
 
-        foreach my $key ( @keys ) { 
+        foreach my $ship ( @_ ){
             $cv->begin;
-            $db->get( $key )->cb( sub {
-                results{ $key } = shift->recv;
-                cv->end;
+            $fleet->find( $ship )->cb( sub {
+                $squad{ $ship } = shift->recv;
+                $cv->end;
             });
         }
 
         $cv->end;
-        $cv;
+        return $cv;
     }
 
-And using the C<AnyEventX::CondVar> approach:
-
-    use AnyEventX::CondVar;
-
-    sub get_keys {
-        cv( @_ )->map( sub { 
-            $_ => $db->get( $_ )
-        });
-    }
-
-Power comes from conciseness, all other things being equal. The
-behavior of the first example is not immediately obvious. It requires
-some mental parsing to understand the non-linear execution flow of the
-code. The second example has the merit of describing functionality in
-a short and effective way. It is also much easier to maintain.
-
-=head2 Design philosophy
-
-We believe that returning condition variables from asynchronous API's
-is more powerful than requesting callbacks from users for the
-following reasons:
-
-=over
-
-=item *
-
-Your API can be used in a blocking or non-blocking fashion
-
-=item *
-
-You return meaningful values from your asynchronous functions
-
-=item *
-
-You save yourself an argument in your function calls
-
-=back
-
-Building asynchronous APIs then boils down to:
-
-=over
-
-=item *
-
-Performing asynchronous operations ( HTTP, database, file IO, ...  )
-
-=item *
-
-Applying data transformations and
-
-=item *
-
-Returning them through a condition variable.
-
-=back
-
-Our goal is to make the data transformations as clear and effective as
-possible. We claim that in most cases, it is not necessary to leave
-the realm of condition variables to describe data transformations.  It
-is somewhat wasteful to "peek" into condition variables and build
-new ones for simple transformations:
-
-    use AnyEvent;
-
-    sub penguins {
-        my $cv = AnyEvent->condvar;
-
-        $db->get( 'zoo_animals' )->cb( sub {
-            my @animals = shift->recv;
-            $cv->send( grep { $_->type eq 'penguin' } @animals );
-        });
-
-        $cv;
-    }
-
-The above example could be more concisely describe as follows:
-
-    use AnyEventX::CondVar;
-
-    sub penguins {
-        $db->get( 'zoo_animals' )
-            ->grep( sub { $_->type eq 'penguin' } );
-    }
-
-Using the second form saves you from writing a lot of boilerplate code
-that can be automatically handled for you. Both examples above are
-functionally identical. This example holds for many list
-transformations such as C<map>, C<sort> and C<reduce>.
-
-Something else you might be doing a lot when writing asynchronous code
-is performing parallel operations with merge-point callbacks:
-
-    use AnyEvent;
-
-    my $cv = AnyEvent->condvar;
-
-    my ( $roy, $silo );
-
-    $cv->begin;
-    $db->get( 'roy' )->cb( sub { 
-        $roy = shift->recv; 
-        $cv->end; 
+    # Usage (non-blocking)
+    assemble_squad(
+        'Millennium Falcon',
+        'USS Enterprise',
+        'Destiny',   
+    )->cb( sub {
+        my %squad = shift->recv;
     });
 
-    $cv->begin;
-    $db->get( 'silo' )->cb( sub { 
-        $silo = shift->recv; 
-        $cv->end; 
+This is the traditional way of building condition variables. You set
+your callback in the first C<being> call. This will be triggered when
+all the fleet ships are assembled and will call C<send> on your
+condition variable. Then you loop over all of your ships, setting
+non-blocking callbacks with the proper C<begin> and C<end> calls to
+increment and decrement the condition variables internal counter. You
+give this condition variable to the caller who will wait for the fleet
+to assemble in a blocking or non-blocking way.
+
+According to us, there are a few problems with this approach:
+essentially code readability and execution flow. It is not immediately
+clear how this code works and when different blocks of code execute.
+The order of execution is confusing. This might be fine for small
+projects but becomes rapidly unmaintainable for non-trivial projects.
+Continuum allows you to rewrite the above example in a functionally
+equivalent manner as:
+
+    use Continuum;
+
+    sub assemble_squad {
+        portal->append( map{ $fleet->find( $_ ) } @_ );
+    }
+
+    # Usage
+    assemble_squad(
+        'Millennium Falcon',
+        'USS Enterprise',
+        'Destiny',   
+    )->then( sub {
+        my %squad = @_;
     });
 
-    $cv->cb( sub {
-        # Do stuff with roy and silo. Be gentle !
-    });
+We use C<append> in the example above, which is one of multiple
+functions available in the portal API. C<append> essentially acts as a
+merge-point for portals or condition variables. It builds a new portal
+that will trigger only once all the input portal values are available.
+In our case, C<append> creates a new portal out of which the
+Millennium Falcon, the USS Enterprise and the Destiny will fly out at
+the same time once they have been found. 
 
-We provide two powerful constructs for dealing with this problem:
-C<cons> and C<then> for concatenating condition variables and handling
-data dependencies:
+Now, let's assume our C<$fleet> API is portal-enabled and returns
+portals for all of its calls. We could selectively find individual
+ships:
 
-    use AnyEventX::CondVar;
-
-    $db->get( 'roy' )
-        ->cons( $db->get( 'silo' ) )
+    $fleet->find( 'Millennium Falcon' ) =
+        ->cons( $fleet->find( 'USS Enterprise' ) )
         ->then( sub {
-            my ( $roy, $silo ) = @_;
-            # Do stuff with roy and silo. Be nice !
+            my @ships = @_;
         });
 
-From the example above, you notice that calls such as C<cons> and
-C<then> can be chained. This holds true for every method in this
-library. Every call produces a new condition variable holding the
-result of the previous transformation. 
+C<cons> essentially creates a new portal that concatenates the values
+of two portals. It will trigger once both input portal values are
+available. This is similar to C<append>. In fact, C<append> is
+implemented using C<cons>. It is important to notice that all the
+calls to C<append> and C<cons> happen in parallel.
 
-=head2 Continuation style
+C<then> allows you to set a function to process the results of the
+previous portal once they are available. When both the Millennium
+Falcon and the USS Enterprise are found, they can be processed in
+C<then>. It will also return a new portal containing the
+transformations applied to the ships.
 
-Continuations are the basic building blocks of asynchronous programs.
-In this library, they are provided by the C<then> operation. From a
-C<then> callback, you can return any value which will automatically
-become available to the next chained operation: 
+When you are working with Continuum, you are chaining portals
+together. Once something comes out of the first portal, it will go
+through your portal chain and come out transformed from the last
+portal in your chain. Another analogy for Continuum is that you are
+applying transformation to future values. Applying a transformation to
+a portal is essentially equivalent to applying the same transformation
+to the value that will come out of the portal sometime in the future.
+The portal only stores the transformation until it can be applied to
+the value coming out of the portal.
 
-    $db->get( 'a' )
-        ->then( sub { a => shift } )
-        ->then( sub { my ( $key, $value ) = @_ } );
+=head2 Extended examples
 
-You can also return a condition variable from a C<then> callback. The
-internal value of the condition variable will be automatically
-available to the next chained operation:
+Let's build on top of the previous example and create a function that
+can repair a ship. It needs to find the ship, repair it and put it
+back into the fleet. These 3 actions are provided by the C<$fleet> API
+which is portal-enabled.
 
-    $db->get( 'a' )
-        ->then( sub { $db->get( 'b' ) } )
-        ->then( sub { my $b = shift; } );
+    # Returns a portal
+    sub find_and_repair {
+        my $ship = shift;
+        $fleet->find( $ship )
+            ->then( sub { $fleet->repair( shift ) } )
+            ->then( sub { $fleet->put( shift ) } );
+    }
 
-You can return multiple condition variables from a C<then> callback.
-You can even mix them with regular values. C<then> does the right
-thing by making the regular values directly available to the next
-chained operation, together with the internal values of the condition
-variables:
+We have a data dependency between the 3 asynchronous operations find,
+repair and put. They can not be processed in parallel. We use the
+C<then> keyword to chain transformations to our data when there are
+data dependencies (i.e. we can only repair a ship once we found it). 
 
-    $db->get( 'a' )
-        ->then( sub { shift, $db->get( 'b' ) } )
-        ->then( sub { my ( $a, $b ) = @_ } );
+There is however no data dependency between repairing two distinct
+ships. We can essentially repair them in parallel:
 
-This holds for most of the functions in the API. You can use C<map> to
-transform values into a mix of regular variables and condition
-variables and chain it with C<then> to fetch all the results:
+    find_and_repair( 'Millennium Falcon' )
+        ->cons( find_and_repair( 'USS Enterprise' ) )
+        ->cons( find_and_repair( 'Destiny' ) )
+        ->then( sub {
+            my @repaired_ships = @_;
+        });
 
-    cv( @keys )
-        ->map( sub { $_ => $db->get( $_ ) } )
-        ->then( sub { my %results = @_ } );
+We can even repair a whole fleet of ships in parallel:
 
-C<cv> is only a helper function to access the API if you don't have an
-initial condition variable. Note that in all of the examples above, we
-do not perform any blocking calls. We only describe how the data
-should be transformed once it becomes available. 
+    portal
+        ->append( map { find_and_repair( $_ ) } @ships )
+        ->then( sub {
+            my @repaired_ships = @_;
+        });
 
-=head2 More please !
+You use C<cons> to concatenate one value or portal. You use C<append>
+if you need to append a list of values or portals. 
 
-For a complete and exhaustive documentation of the library, head over
-to the wiki ! ( TODO ... )
+We could also have implemented the find and repair algorithm
+differently, using the C<map> function of the portal API:
+
+    sub find_and_repair {
+        my @ships = @_;
+        portal
+            ->append( @ships )
+            ->map( sub { $fleet->find( $_ ) } )
+            ->map( sub { $fleet->repair( $_ ) } )
+            ->map( sub { $fleet->put( $_ ) } );
+    }
+
+We start by creating a new portal containing all the ships. Then we
+map them through 3 portals that finds the ships, repairs them and puts
+them back into the fleet. The difference here is that the find, repair
+and put steps happen in batch: first we find all the ships in
+parallel, then we repair them all in parallel, then we put them back
+into the fleet in parallel. In our first example, the find => repair
+=> put pipeline was independent for every ship.
+
+=head2 From callbacks to portals
+
+We didn't explain the C<portal> keyword yet. It allows us to create a
+new portal from scratch. We used it up until now to create an empty
+portal when we didn't have a prior portal, to access the portal API.
+C<portal> is actually much more powerful, as it allows us to create
+portals from a chain of arbitrary callbacks. This is very useful when
+you need to map a callback-oriented API to a portal API. Let's
+demonstrate.
+
+Assume we have an asynchronous callback-oriented C<$db> API.
+
+    use Continuum;
+
+    sub get {
+        my $key = shift;
+        portal {
+            $db->get( $key => $jump );
+        } continuum {
+            my $value = shift;
+        }
+    }; 
+
+Portal takes a list of functions as argument. We have a very neat
+syntax for you to create portals with function lists using the
+C<continuum> keyword. In every function, you are either expected to
+call C<$jump> to go to the next function in the chain, or return a
+portal ( or AnyEvent condition variable ) which will trigger the next
+function when the results are available. 
+
+The C<portal> call will immediately return a portal. The value that
+will come out of the portal is the return value of your last function
+in the chain. The above example is a trivial one-to-one mapping from a
+callback API to a portal call. It is usually more interesting to write
+application specific portals from a callback API. We might want to
+create a portal that finds all the repair-class ships in our fleet and
+command them to repair all the damaged ships. We assume the C<$fleet>
+API is an asynchronous callback-oriented framework.
+
+    use Continuum;
+
+    sub repair_fleet {
+        my $fleet = shift;
+        portal {
+            $fleet->findclass( repair => $jump )
+        } continuum {
+            my @repair_ships = @_;
+            $fleet->finddamaged( sub { 
+                my @damaged_ships = @_;
+                $jump->( \@repair_ships, \@damaged_ships ); 
+            });
+        } continuum {
+            my ( $repair_ships, $damaged_ships ) = @_;
+            $fleet->repair( $repair_ships => $damaged_ships => $jump );
+        } continuum {
+        # Let's assume that $fleet->repair will return the repaired ships
+            my @ships = @_;
+        }
+    }
+
+Now, with this portal function, we have access to the whole portal
+API. If we have multiple fleets to repair in parallel, it's simple:
+
+    repair_fleet( $alpha_fleet )
+        ->cons( repair_fleet( $beta_fleet ) )
+        ->cons( repair_fleet( $gamma_fleet ) )
+        ->then( sub {
+            my @ships = @_;
+        });
+
+=head2 Learn more about Portals
+
+You can write most of your portal code using the techniques described
+in this tutorial. There are however a lot more functions available in
+the portal API. Feel free to head to the wiki for additional
+documentation.
+
+( TODO ... )
 
 =head2 Bugs
 
 Please report any bugs in the projects bug tracker:
 
-L<http://github.com/ciphermonk/AnyEventX-CondVar/issues>
+L<http://github.com/ciphermonk/Continuum/issues>
 
 You can also provide a fix by contributing to the project:
 
@@ -361,7 +393,7 @@ We're glad you want to contribute! It's simple:
 =over
 
 =item * 
-Fork the project
+Fork the Continuum (and perhaps claim a nobel prize in physics)
 
 =item *
 Create a branch C<git checkout -b my_branch>
