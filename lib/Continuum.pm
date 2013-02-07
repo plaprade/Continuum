@@ -59,23 +59,23 @@ specifically the L<AnyEvent::CondVar|AnyEvent> condition variables. If
 you're not yet familiar with AnyEvent, it's a good time to get
 acquainted! Understanding condition variables is essential to using
 this module efficiently. However, we provide a different analogy to
-the I<boring> condition variable semantics: we'll talk about Portals!
-Yes, just like the Stargate Portals.
+the I<boring> condition variable semantics: we'll talk about portals!
+Yes, just like the Stargate portals.
 
 There are two schools of asynchronous programming styles in Perl.
 Either you require the user to provide a callback that will be
 triggered once the results are available, or you can give the user a
 promise of delivering the results some time in the future. In the
 L<AnyEvent> framework, this promise is a condition variable. In
-Continuum, we call them Portals. Essentially, if someone wants to do
+Continuum, we call them portals. Essentially, if someone wants to do
 an asynchronous database call, we hand them a Portal and we promise
 that the database results will come out of that Portal once they are
 ready. 
 
 Aside from the different naming conventions, the power of Continuum
 comes from it's Portal manipulation API. We make it easy to connect
-Portals, apply various functions to Portals and handle the Portal
-results once they are available. Because Portals are essentially
+portals, apply various functions to portals and handle the Portal
+results once they are available. Because portals are essentially
 glorified condition variables, Continuum also makes it easier to work
 with them. Let's see our way through an example to understand the
 differences and advantages of Continuum. Let's assume we have access
@@ -113,22 +113,22 @@ variables:
         my %squad = shift->recv;
     });
 
-This is the traditional way of building condition variables. You set
-your callback in the first C<being> call. This will be triggered when
-all the fleet ships are assembled and will call C<send> on your
-condition variable. Then you loop over all of your ships, setting
-non-blocking callbacks with the proper C<begin> and C<end> calls to
-increment and decrement the condition variables internal counter. You
-give this condition variable to the caller who can wait for the fleet
-to assemble in a blocking or non-blocking way.
+This is the traditional way of building condition variables. You set your
+callback in the first C<being> call. This will be triggered when all the
+fleet ships are assembled and will call C<send> on your condition variable.
+A loop iterates over all of your ships, setting non-blocking callbacks with
+the proper C<begin> and C<end> calls to increment and decrement a condition
+variable's internal counter. This condition variable is returned to the
+caller who can wait for the fleet to assemble in a blocking or non-blocking
+way.
 
-Our humbly believe there are a few problems with this approach:
-essentially code readability and execution flow. It is not immediately
-obvious how this code works and when different blocks of code execute.
-The order of execution is confusing. This might be fine for small
-projects but becomes rapidly unmaintainable for non-trivial code bases.
-Continuum allows you to rewrite the above example in a functionally
-equivalent manner as:
+
+There are a few problems with this approach regarding code readability and
+execution flow. It is not immediately obvious how this code works and when
+different blocks of code execute.  The order of execution is confusing. This
+might be fine for small projects but becomes rapidly unmaintainable for
+non-trivial code bases.  Continuum allows you to rewrite the above example in
+a functionally equivalent manner as:
 
     use Continuum;
 
@@ -148,15 +148,14 @@ equivalent manner as:
 Much shorter and (hopefully) easier to understand.
 
 We use C<append> in this example, which is one of multiple functions
-available in the Portal API. Append essentially acts as a merge-point
-for Portals and condition variables. It builds a new Portal that will
-trigger only once all the input Portal values are available.  In this
-case, append creates a new Portal that will deliver the Millennium
-Falcon, the USS Enterprise and the Destiny once all of them are
-available.
+available in the Portal API. Append essentially acts as a merge-point for
+portals and condition variables. It builds a new Portal that will trigger
+only once all the input portals have been traversed.  In this case, append
+creates a new Portal that will deliver the Millennium Falcon, the USS
+Enterprise and the Destiny once all of them come through.
 
 Now, let's assume our C<$fleet> API is Portal-enabled and returns
-Portals for all of its calls. We could selectively find individual
+portals for all of its calls. We could selectively find individual
 ships:
 
     $fleet->find( 'Millennium Falcon' ) 
@@ -166,10 +165,10 @@ ships:
         });
 
 C<cons> essentially creates a new Portal that will deliver the result
-of it's two input Portals when both of them are ready. It concatenates
+of it's two input portals when both of them are ready. It concatenates
 both results into a list. This is similar to C<append>. In fact,
 append is implemented using cons. It is also interesting to note that
-all Portals passed to cons or append execute in parallel.
+all portals passed to cons or append execute in parallel.
 
 C<then> is used when you have data dependencies between different
 asynchronous calls. It is probably the most important function of the
@@ -185,9 +184,9 @@ eventually return the value returned by the C<then> function. If you
 return a Portal or a condition variable from within your function, it
 will be linked to the outer Portal created by C<then>.
 
-When you are playing with Continuum, you are chaining Portals together
+When you are playing with Continuum, you are chaining portals together
 using transformations. Every call to the Portal API creates a new
-Portal returning a transformation of the previous Portals results.
+Portal returning a transformation of the previous portals results.
 When something actually comes out of the first Portal in your chain,
 all the transformations that you have created will be applied and the
 final result will come out of the last Portal in your chain. As far as
@@ -241,8 +240,8 @@ We can even repair a whole fleet of ships in parallel:
         });
 
 C<cons> and C<append> are similar in function. You use cons when you
-want to process two Portals in parallel. You use append when you have
-a list of Portals to process in parallel. 
+want to process two portals in parallel. You use append when you have
+a list of portals to process in parallel. 
 
 We could also have implemented the find and repair algorithm
 differently, using the C<map> function from the Portal API:
@@ -257,20 +256,20 @@ differently, using the C<map> function from the Portal API:
     }
 
 We start by creating a new Portal containing all the ships. Then we
-map them through 3 Portals that respectively finds the ships, repairs
+map them through 3 portals that respectively finds the ships, repairs
 them and puts them back into the fleet. The difference here is that
 the find, repair and put are batch operations. First we find all
 the ships in parallel, then we repair them all in parallel, then we
 put them back into the fleet in parallel. In our first example, the
 find => repair => put pipeline was independent for every ship.
 
-=head2 From callbacks to Portals
+=head2 From callbacks to portals
 
 We didn't explain the C<portal> keyword yet. It allows us to create a
 new Portal from scratch. We used it up until now to create an empty
 Portal when we didn't have a prior Portal to access the Portal API.
 C<portal> is actually much more powerful, as it allows us to create
-Portals from a chain of arbitrary callbacks. This is very useful when
+portals from a chain of arbitrary callbacks. This is very useful when
 you need to map a callback-oriented API to a Portal API. Let's
 demonstrate.
 
@@ -288,7 +287,7 @@ Assume we have an asynchronous callback-oriented C<$db> API.
     }; 
 
 C<portal> takes a list of functions as argument. We have a very neat
-syntax to create Portals with the C<continuum> keyword. Every
+syntax to create portals with the C<continuum> keyword. Every
 C<continuum> simply declares a new function. In every function, you
 are either expected to call C<$jump> to go to the next function in the
 chain, or return a Portal ( or L<AnyEvent> condition variable ) which
@@ -298,7 +297,7 @@ The C<Portal> call will immediately return a Portal to the user. The
 value that will come out of the Portal is the return value of your
 last function in the chain. The above example is a trivial one-to-one
 mapping from a callback API to a Portal. It is usually more
-interesting to write application specific Portals from a callback API.
+interesting to write application specific portals from a callback API.
 We might want to create a Portal that finds all the repair-class ships
 in our fleet and command them to repair all the damaged ships. Let's
 assume the C<$fleet> API is an asynchronous callback-oriented
@@ -335,7 +334,7 @@ in parallel!
             my @ships = @_;
         });
 
-=head2 Learn more about Portals
+=head2 Learn more about portals
 
 You can write most of your Portal code using the techniques described
 in this tutorial. There are however a lot more functions available in
