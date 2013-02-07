@@ -122,7 +122,6 @@ variable's internal counter. This condition variable is returned to the
 caller who can wait for the fleet to assemble in a blocking or non-blocking
 way.
 
-
 There are a few problems with this approach regarding code readability and
 execution flow. It is not immediately obvious how this code works and when
 different blocks of code execute.  The order of execution is confusing. This
@@ -133,7 +132,7 @@ a functionally equivalent manner as:
     use Continuum;
 
     sub assemble_squad {
-        portal->append( map{ $fleet->find( $_ ) } @_ );
+        portal( map{ $fleet->find( $_ ) } @_ );
     }
 
     # Usage
@@ -147,28 +146,31 @@ a functionally equivalent manner as:
 
 Much shorter and (hopefully) easier to understand.
 
-We use C<append> in this example, which is one of multiple functions
-available in the Portal API. Append essentially acts as a merge-point for
-portals and condition variables. It builds a new Portal that will trigger
-only once all the input portals have been traversed.  In this case, append
-creates a new Portal that will deliver the Millennium Falcon, the USS
-Enterprise and the Destiny once all of them come through.
+C<portal> can build a new Portal from a list of L<AnyEvent> condition
+variables. The new portal will trigger once all the conditions become
+true in the input condition variables. C<portal> can also build a
+portal from a list of Portals or from a code reference. We will study
+such an example later in this tutorial. In the example above,
+C<portal> creates a new Portal that will deliver the Millennium
+Falcon, the USS Enterprise and the Destiny once all of them are found
+(through their underlying condition variable).
 
-Now, let's assume our C<$fleet> API is Portal-enabled and returns
-portals for all of its calls. We could selectively find individual
-ships:
+Using C<portal> is equivalent to using the C<merge> call from the
+Portal API. We will have a look at it now. Let's assume our C<$fleet>
+API is Portal-enabled and returns portals for all of its calls. We
+could selectively find individual ships in parallel:
 
     $fleet->find( 'Millennium Falcon' ) 
-        ->cons( $fleet->find( 'USS Enterprise' ) )
+        ->merge( $fleet->find( 'USS Enterprise' ) )
         ->then( sub {
             my @ships = @_;
         });
 
-C<cons> essentially creates a new Portal that will deliver the result
-of it's two input portals when both of them are ready. It concatenates
-both results into a list. This is similar to C<append>. In fact,
-append is implemented using cons. It is also interesting to note that
-all portals passed to cons or append execute in parallel.
+C<merge> essentially creates a new Portal that will deliver the
+results of it's input portals when all of them are ready. It executes
+all the portals in parallel and merges the results into a list.
+C<merge> is part of the Portal API and as such, is called in I<chain>
+mode on an existing Portal.
 
 C<then> is used when you have data dependencies between different
 asynchronous calls. It is probably the most important function of the
@@ -182,7 +184,9 @@ C<then> will create a new Portal, like every other call in the
 Continuum API (this allows for chaining calls). The Portal will
 eventually return the value returned by the C<then> function. If you
 return a Portal or a condition variable from within your function, it
-will be linked to the outer Portal created by C<then>.
+will be linked to the outer Portal created by C<then>. You can also
+return a list of Portals or condition variables. They will be merged
+using the C<merge> API call before being linked to the outer Portal.
 
 When you are playing with Continuum, you are chaining portals together
 using transformations. Every call to the Portal API creates a new
@@ -201,7 +205,7 @@ value that will come out of the Portal some time in the future.  The
 Portal only stores the transformation until it can be applied to the
 value coming out of the Portal.
 
-=head2 Extended examples
+=head2 More Examples
 
 Let's build on top of the previous example and create a function that
 can repair a ship. It needs to find the ship, repair it and put it
@@ -221,35 +225,24 @@ can not process them in parallel (we actually need to find a ship
 before we can start the repair work). Using C<then>, we chain the
 necessary transformations to our ship.
 
-Nothing prevents us, however, from finding and repairing two ships in
-parallel:
+Nothing prevents us, however, from finding and repairing multiple
+ships in parallel:
 
-    find_and_repair( 'Millennium Falcon' )
-        ->cons( find_and_repair( 'USS Enterprise' ) )
-        ->cons( find_and_repair( 'Destiny' ) )
-        ->then( sub {
-            my @repaired_ships = @_;
-        });
+    find_and_repair( 'Millennium Falcon' )->merge( 
+        find_and_repair( 'USS Enterprise' ) 
+        find_and_repair( 'Destiny' ) 
+    )
 
 We can even repair a whole fleet of ships in parallel:
 
-    portal
-        ->append( map { find_and_repair( $_ ) } @ships )
-        ->then( sub {
-            my @repaired_ships = @_;
-        });
-
-C<cons> and C<append> are similar in function. You use cons when you
-want to process two portals in parallel. You use append when you have
-a list of portals to process in parallel. 
+    portal( map { find_and_repair( $_ ) } @ships )
 
 We could also have implemented the find and repair algorithm
 differently, using the C<map> function from the Portal API:
 
     sub find_and_repair {
         my @ships = @_;
-        portal
-            ->append( @ships )
+        portal( @ships )
             ->map( sub { $fleet->find( $_ ) } )
             ->map( sub { $fleet->repair( $_ ) } )
             ->map( sub { $fleet->put( $_ ) } );
@@ -263,76 +256,127 @@ the ships in parallel, then we repair them all in parallel, then we
 put them back into the fleet in parallel. In our first example, the
 find => repair => put pipeline was independent for every ship.
 
-=head2 From callbacks to portals
+=head2 Bridging the gap
 
-We didn't explain the C<portal> keyword yet. It allows us to create a
-new Portal from scratch. We used it up until now to create an empty
-Portal when we didn't have a prior Portal to access the Portal API.
-C<portal> is actually much more powerful, as it allows us to create
-portals from a chain of arbitrary callbacks. This is very useful when
-you need to map a callback-oriented API to a Portal API. Let's
-demonstrate.
+In order to access to Portal API, we need an easy way to create
+Portals. The C<portal> keyword is there to help us bridge the gap
+between traditional asynchronous methods (condition variables and
+callbacks) and the Portal world. We already saw how to create a Portal
+from a condition variable earlier in this tutorial.
 
-Assume we have an asynchronous callback-oriented C<$db> API.
+    portal( @condition_variables )
 
-    use Continuum;
+This creates a Portal that merges the results of all the input
+condition variables together and returns them when they are all
+available. The condition variables execute in parallel.  If you are
+working with a condition variable API, it is easy to use them to
+access the Portal API:
 
-    sub get {
+    portal( $db->get( $key1 ), $db->get( $key2 ) )
+        ->then( sub { 
+            my ( $value1, $value2 ) = @_;
+            ...
+        })
+
+We also provide an easy way to create Portals from a callback oriented
+API (like L<Mojo::Redis>):
+
+    portal( sub { $redis->get( $key => $jump ) } )
+
+It works by passing a function to C<portal> in which you can make your
+call to your callback-oriented API. Inside the function, you have
+access to the C<$jump> variable which is equal to the Portal returned
+by the C<portal> call. This allows you to pass it as a code reference
+to your callback API, or call C<$jump->send(...)> manually when you
+are ready to send data through your Portal. Let's demonstrate that
+second case:
+
+    portal( sub {
+        my $jump = $jump; # Create lexical variable
+        $redis->get( $key => sub {
+            my ( $redis, $value ) = @_;
+            # Equivalent to $jump->send( $value )
+            $jump->( $value ); # Trigger the Portal
+        });
+    })
+
+Because C<$jump> is a local variable, we need to create a lexical
+equivalent to access it from the Redis callback. Using this style, we
+can easily access to Portal API:
+
+    # Prepare the Portal
+    sub portal_get {
         my $key = shift;
-        portal {
-            $db->get( $key => $jump );
-        } continuum {
-            my $value = shift;
-        }
-    }; 
+        portal( sub { 
+            my $jump = $jump;
+            $redis->get( $key => sub { $jump->( $_[1] ) } ) 
+        });
+    }
 
-C<portal> takes a list of functions as argument. We have a very neat
-syntax to create portals with the C<continuum> keyword. Every
-C<continuum> simply declares a new function. In every function, you
-are either expected to call C<$jump> to go to the next function in the
-chain, or return a Portal ( or L<AnyEvent> condition variable ) which
-will trigger the next function when the results are available. 
+    # Use your new Portal function
+    portal_get( $key1 )->merge( portal_get( $key2 ) )
+        ->then( sub {
+            my ( $value1, $value2 ) = @_;
+        });
 
-The C<Portal> call will immediately return a Portal to the user. The
-value that will come out of the Portal is the return value of your
-last function in the chain. The above example is a trivial one-to-one
-mapping from a callback API to a Portal. It is usually more
-interesting to write application specific portals from a callback API.
-We might want to create a Portal that finds all the repair-class ships
-in our fleet and command them to repair all the damaged ships. Let's
-assume the C<$fleet> API is an asynchronous callback-oriented
-framework.
+We can even process lists of keys in this way
+
+    portal( map { portal_get( $_ ) } @keys )
+        ->then( sub {
+            my @values = @_;
+            ...
+        });
+
+This last example demonstrates the last case of the C<portal>
+function. It also accepts lists of Portals and will process them in
+the same way as it processes condition variables. It merges all the
+input portals and returns their values from a new Portal once they are
+all available. In the example above, we simply chain a C<then> call to
+capture the results in a callback.
+
+While I still have your attention, let's work our way through a last
+example to build on the concepts we have just learned. Let's assume we
+have access to a callback-oriented C<$fleet> API and we want to write
+a little program that can find all the ships with repair capability in
+the fleet. We then want to find all the damaged ships in our fleet and
+have them repaired by our repair ships. 
 
     use Continuum;
+
+    sub fleet_find {
+        my ( $fleet, type ) = @_;
+        # Create a portal returning all the ships
+        portal( sub { $fleet->getall( $jump ) } )
+            # and filter the portal results by ship type
+            ->grep( sub { $_->type eq $type } )
+            # Return a reference through the portal
+            ->then( sub { \@_ } );
+    }
 
     sub repair_fleet {
         my $fleet = shift;
-        portal {
-            $fleet->findclass( repair => $jump )
-        } continuum {
-            my @repair_ships = @_;
-            $fleet->finddamaged( sub { 
-                my @damaged_ships = @_;
-                $jump->( \@repair_ships, \@damaged_ships ); 
+        fleet_find( $fleet => 'repair' )
+            ->merge( fleet_find( $fleet => 'damaged' ) )
+            ->then( sub {
+                my ( $repairer, $damaged ) = @_; 
+                portal( sub {
+                    $fleet->repair( $repairer, $damaged, $jump )
+                });
             });
-        } continuum {
-            my ( $repair_ships, $damaged_ships ) = @_;
-            $fleet->repair( $repair_ships => $damaged_ships => $jump );
-        } continuum {
-        # Let's assume that $fleet->repair will return the repaired ships
-            my @ships = @_;
-        }
     }
 
-Now, with this Portal at our disposial, we can repair multiple fleets
-in parallel!
+With these functions, we have the possibility of repairing a complete
+fleet of ships! If we have multiple fleets under our command, it is
+easy to repair them all in parallel:
 
     repair_fleet( $alpha_fleet )
-        ->cons( repair_fleet( $beta_fleet ) )
-        ->cons( repair_fleet( $gamma_fleet ) )
-        ->then( sub {
-            my @ships = @_;
-        });
+        ->merge( repair_fleet( $gamma_fleet ) )
+
+Or if we need to repair an entire empire of fleets:
+
+    portal( map { repair_fleet( $_ ) } @fleets )
+
+The sky's the limit!
 
 =head2 Learn more about portals
 

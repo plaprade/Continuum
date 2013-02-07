@@ -10,23 +10,23 @@ specifically the [AnyEvent::CondVar](http://search.cpan.org/perldoc?AnyEvent) co
 you're not yet familiar with AnyEvent, it's a good time to get
 acquainted! Understanding condition variables is essential to using
 this module efficiently. However, we provide a different analogy to
-the _boring_ condition variable semantics: we'll talk about Portals!
-Yes, just like the Stargate Portals.
+the _boring_ condition variable semantics: we'll talk about portals!
+Yes, just like the Stargate portals.
 
 There are two schools of asynchronous programming styles in Perl.
 Either you require the user to provide a callback that will be
 triggered once the results are available, or you can give the user a
 promise of delivering the results some time in the future. In the
 [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) framework, this promise is a condition variable. In
-Continuum, we call them Portals. Essentially, if someone wants to do
+Continuum, we call them portals. Essentially, if someone wants to do
 an asynchronous database call, we hand them a Portal and we promise
 that the database results will come out of that Portal once they are
 ready. 
 
 Aside from the different naming conventions, the power of Continuum
 comes from it's Portal manipulation API. We make it easy to connect
-Portals, apply various functions to Portals and handle the Portal
-results once they are available. Because Portals are essentially
+portals, apply various functions to portals and handle the Portal
+results once they are available. Because portals are essentially
 glorified condition variables, Continuum also makes it easier to work
 with them. Let's see our way through an example to understand the
 differences and advantages of Continuum. Let's assume we have access
@@ -66,28 +66,27 @@ variables:
     });
 ```
 
-This is the traditional way of building condition variables. You set
-your callback in the first `being` call. This will be triggered when
-all the fleet ships are assembled and will call `send` on your
-condition variable. Then you loop over all of your ships, setting
-non-blocking callbacks with the proper `begin` and `end` calls to
-increment and decrement the condition variables internal counter. You
-give this condition variable to the caller who can wait for the fleet
-to assemble in a blocking or non-blocking way.
+This is the traditional way of building condition variables. You set your
+callback in the first `being` call. This will be triggered when all the
+fleet ships are assembled and will call `send` on your condition variable.
+A loop iterates over all of your ships, setting non-blocking callbacks with
+the proper `begin` and `end` calls to increment and decrement a condition
+variable's internal counter. This condition variable is returned to the
+caller who can wait for the fleet to assemble in a blocking or non-blocking
+way.
 
-Our humbly believe there are a few problems with this approach:
-essentially code readability and execution flow. It is not immediately
-obvious how this code works and when different blocks of code execute.
-The order of execution is confusing. This might be fine for small
-projects but becomes rapidly unmaintainable for non-trivial code bases.
-Continuum allows you to rewrite the above example in a functionally
-equivalent manner as:
+There are a few problems with this approach regarding code readability and
+execution flow. It is not immediately obvious how this code works and when
+different blocks of code execute.  The order of execution is confusing. This
+might be fine for small projects but becomes rapidly unmaintainable for
+non-trivial code bases.  Continuum allows you to rewrite the above example in
+a functionally equivalent manner as:
 
 ```perl
     use Continuum;
 
     sub assemble_squad {
-        portal->append( map{ $fleet->find( $_ ) } @_ );
+        portal( map{ $fleet->find( $_ ) } @_ );
     }
 
     # Usage
@@ -102,31 +101,33 @@ equivalent manner as:
 
 Much shorter and (hopefully) easier to understand.
 
-We use `append` in this example, which is one of multiple functions
-available in the Portal API. Append essentially acts as a merge-point
-for Portals and condition variables. It builds a new Portal that will
-trigger only once all the input Portal values are available.  In this
-case, append creates a new Portal that will deliver the Millennium
-Falcon, the USS Enterprise and the Destiny once all of them are
-available.
+`portal` can build a new Portal from a list of [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition
+variables. The new portal will trigger once all the conditions become
+true in the input condition variables. `portal` can also build a
+portal from a list of Portals or from a code reference. We will study
+such an example later in this tutorial. In the example above,
+`portal` creates a new Portal that will deliver the Millennium
+Falcon, the USS Enterprise and the Destiny once all of them are found
+(through their underlying condition variable).
 
-Now, let's assume our `$fleet` API is Portal-enabled and returns
-Portals for all of its calls. We could selectively find individual
-ships:
+Using `portal` is equivalent to using the `merge` call from the
+Portal API. We will have a look at it now. Let's assume our `$fleet`
+API is Portal-enabled and returns portals for all of its calls. We
+could selectively find individual ships in parallel:
 
 ```perl
     $fleet->find( 'Millennium Falcon' ) 
-        ->cons( $fleet->find( 'USS Enterprise' ) )
+        ->merge( $fleet->find( 'USS Enterprise' ) )
         ->then( sub {
             my @ships = @_;
         });
 ```
 
-`cons` essentially creates a new Portal that will deliver the result
-of it's two input Portals when both of them are ready. It concatenates
-both results into a list. This is similar to `append`. In fact,
-append is implemented using cons. It is also interesting to note that
-all Portals passed to cons or append execute in parallel.
+`merge` essentially creates a new Portal that will deliver the
+results of it's input portals when all of them are ready. It executes
+all the portals in parallel and merges the results into a list.
+`merge` is part of the Portal API and as such, is called in _chain_
+mode on an existing Portal.
 
 `then` is used when you have data dependencies between different
 asynchronous calls. It is probably the most important function of the
@@ -140,11 +141,13 @@ defining continuations in Continuum.
 Continuum API (this allows for chaining calls). The Portal will
 eventually return the value returned by the `then` function. If you
 return a Portal or a condition variable from within your function, it
-will be linked to the outer Portal created by `then`.
+will be linked to the outer Portal created by `then`. You can also
+return a list of Portals or condition variables. They will be merged
+using the `merge` API call before being linked to the outer Portal.
 
-When you are playing with Continuum, you are chaining Portals together
+When you are playing with Continuum, you are chaining portals together
 using transformations. Every call to the Portal API creates a new
-Portal returning a transformation of the previous Portals results.
+Portal returning a transformation of the previous portals results.
 When something actually comes out of the first Portal in your chain,
 all the transformations that you have created will be applied and the
 final result will come out of the last Portal in your chain. As far as
@@ -159,7 +162,7 @@ value that will come out of the Portal some time in the future.  The
 Portal only stores the transformation until it can be applied to the
 value coming out of the Portal.
 
-## Extended examples
+## More Examples
 
 Let's build on top of the previous example and create a function that
 can repair a ship. It needs to find the ship, repair it and put it
@@ -181,31 +184,21 @@ can not process them in parallel (we actually need to find a ship
 before we can start the repair work). Using `then`, we chain the
 necessary transformations to our ship.
 
-Nothing prevents us, however, from finding and repairing two ships in
-parallel:
+Nothing prevents us, however, from finding and repairing multiple
+ships in parallel:
 
 ```perl
-    find_and_repair( 'Millennium Falcon' )
-        ->cons( find_and_repair( 'USS Enterprise' ) )
-        ->cons( find_and_repair( 'Destiny' ) )
-        ->then( sub {
-            my @repaired_ships = @_;
-        });
+    find_and_repair( 'Millennium Falcon' )->merge( 
+        find_and_repair( 'USS Enterprise' ) 
+        find_and_repair( 'Destiny' ) 
+    )
 ```
 
 We can even repair a whole fleet of ships in parallel:
 
 ```perl
-    portal
-        ->append( map { find_and_repair( $_ ) } @ships )
-        ->then( sub {
-            my @repaired_ships = @_;
-        });
+    portal( map { find_and_repair( $_ ) } @ships )
 ```
-
-`cons` and `append` are similar in function. You use cons when you
-want to process two Portals in parallel. You use append when you have
-a list of Portals to process in parallel. 
 
 We could also have implemented the find and repair algorithm
 differently, using the `map` function from the Portal API:
@@ -213,8 +206,7 @@ differently, using the `map` function from the Portal API:
 ```perl
     sub find_and_repair {
         my @ships = @_;
-        portal
-            ->append( @ships )
+        portal( @ships )
             ->map( sub { $fleet->find( $_ ) } )
             ->map( sub { $fleet->repair( $_ ) } )
             ->map( sub { $fleet->put( $_ ) } );
@@ -222,91 +214,154 @@ differently, using the `map` function from the Portal API:
 ```
 
 We start by creating a new Portal containing all the ships. Then we
-map them through 3 Portals that respectively finds the ships, repairs
+map them through 3 portals that respectively finds the ships, repairs
 them and puts them back into the fleet. The difference here is that
 the find, repair and put are batch operations. First we find all
 the ships in parallel, then we repair them all in parallel, then we
 put them back into the fleet in parallel. In our first example, the
 find => repair => put pipeline was independent for every ship.
 
-## From callbacks to Portals
+## Bridging the gap
 
-We didn't explain the `portal` keyword yet. It allows us to create a
-new Portal from scratch. We used it up until now to create an empty
-Portal when we didn't have a prior Portal to access the Portal API.
-`portal` is actually much more powerful, as it allows us to create
-Portals from a chain of arbitrary callbacks. This is very useful when
-you need to map a callback-oriented API to a Portal API. Let's
-demonstrate.
-
-Assume we have an asynchronous callback-oriented `$db` API.
+In order to access to Portal API, we need an easy way to create
+Portals. The `portal` keyword is there to help us bridge the gap
+between traditional asynchronous methods (condition variables and
+callbacks) and the Portal world. We already saw how to create a Portal
+from a condition variable earlier in this tutorial.
 
 ```perl
-    use Continuum;
+    portal( @condition_variables )
+```
 
-    sub get {
+This creates a Portal that merges the results of all the input
+condition variables together and returns them when they are all
+available. The condition variables execute in parallel.  If you are
+working with a condition variable API, it is easy to use them to
+access the Portal API:
+
+```perl
+    portal( $db->get( $key1 ), $db->get( $key2 ) )
+        ->then( sub { 
+            my ( $value1, $value2 ) = @_;
+            ...
+        })
+```
+
+We also provide an easy way to create Portals from a callback oriented
+API (like [Mojo::Redis](http://search.cpan.org/perldoc?Mojo::Redis)):
+
+```perl
+    portal( sub { $redis->get( $key => $jump ) } )
+```
+
+It works by passing a function to `portal` in which you can make your
+call to your callback-oriented API. Inside the function, you have
+access to the `$jump` variable which is equal to the Portal returned
+by the `portal` call. This allows you to pass it as a code reference
+to your callback API, or call `$jump-`send(...)> manually when you
+are ready to send data through your Portal. Let's demonstrate that
+second case:
+
+```perl
+    portal( sub {
+        my $jump = $jump; # Create lexical variable
+        $redis->get( $key => sub {
+            my ( $redis, $value ) = @_;
+            # Equivalent to $jump->send( $value )
+            $jump->( $value ); # Trigger the Portal
+        });
+    })
+```
+
+Because `$jump` is a local variable, we need to create a lexical
+equivalent to access it from the Redis callback. Using this style, we
+can easily access to Portal API:
+
+```perl
+    # Prepare the Portal
+    sub portal_get {
         my $key = shift;
-        portal {
-            $db->get( $key => $jump );
-        } continuum {
-            my $value = shift;
-        }
-    }; 
-```
-
-`portal` takes a list of functions as argument. We have a very neat
-syntax to create Portals with the `continuum` keyword. Every
-`continuum` simply declares a new function. In every function, you
-are either expected to call `$jump` to go to the next function in the
-chain, or return a Portal ( or [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition variable ) which
-will trigger the next function when the results are available. 
-
-The `Portal` call will immediately return a Portal to the user. The
-value that will come out of the Portal is the return value of your
-last function in the chain. The above example is a trivial one-to-one
-mapping from a callback API to a Portal. It is usually more
-interesting to write application specific Portals from a callback API.
-We might want to create a Portal that finds all the repair-class ships
-in our fleet and command them to repair all the damaged ships. Let's
-assume the `$fleet` API is an asynchronous callback-oriented
-framework.
-
-```perl
-    use Continuum;
-
-    sub repair_fleet {
-        my $fleet = shift;
-        portal {
-            $fleet->findclass( repair => $jump )
-        } continuum {
-            my @repair_ships = @_;
-            $fleet->finddamaged( sub { 
-                my @damaged_ships = @_;
-                $jump->( \@repair_ships, \@damaged_ships ); 
-            });
-        } continuum {
-            my ( $repair_ships, $damaged_ships ) = @_;
-            $fleet->repair( $repair_ships => $damaged_ships => $jump );
-        } continuum {
-        # Let's assume that $fleet->repair will return the repaired ships
-            my @ships = @_;
-        }
+        portal( sub { 
+            my $jump = $jump;
+            $redis->get( $key => sub { $jump->( $_[1] ) } ) 
+        });
     }
-```
 
-Now, with this Portal at our disposial, we can repair multiple fleets
-in parallel!
-
-```perl
-    repair_fleet( $alpha_fleet )
-        ->cons( repair_fleet( $beta_fleet ) )
-        ->cons( repair_fleet( $gamma_fleet ) )
+    # Use your new Portal function
+    portal_get( $key1 )->merge( portal_get( $key2 ) )
         ->then( sub {
-            my @ships = @_;
+            my ( $value1, $value2 ) = @_;
         });
 ```
 
-## Learn more about Portals
+We can even process lists of keys in this way
+
+```perl
+    portal( map { portal_get( $_ ) } @keys )
+        ->then( sub {
+            my @values = @_;
+            ...
+        });
+```
+
+This last example demonstrates the last case of the `portal`
+function. It also accepts lists of Portals and will process them in
+the same way as it processes condition variables. It merges all the
+input portals and returns their values from a new Portal once they are
+all available. In the example above, we simply chain a `then` call to
+capture the results in a callback.
+
+While I still have your attention, let's work our way through a last
+example to build on the concepts we have just learned. Let's assume we
+have access to a callback-oriented `$fleet` API and we want to write
+a little program that can find all the ships with repair capability in
+the fleet. We then want to find all the damaged ships in our fleet and
+have them repaired by our repair ships. 
+
+```perl
+    use Continuum;
+
+    sub fleet_find {
+        my ( $fleet, type ) = @_;
+        # Create a portal returning all the ships
+        portal( sub { $fleet->getall( $jump ) } )
+            # and filter the portal results by ship type
+            ->grep( sub { $_->type eq $type } )
+            # Return a reference through the portal
+            ->then( sub { \@_ } );
+    }
+
+    sub repair_fleet {
+        my $fleet = shift;
+        fleet_find( $fleet => 'repair' )
+            ->merge( fleet_find( $fleet => 'damaged' ) )
+            ->then( sub {
+                my ( $repairer, $damaged ) = @_; 
+                portal( sub {
+                    $fleet->repair( $repairer, $damaged, $jump )
+                });
+            });
+    }
+```
+
+With these functions, we have the possibility of repairing a complete
+fleet of ships! If we have multiple fleets under our command, it is
+easy to repair them all in parallel:
+
+```perl
+    repair_fleet( $alpha_fleet )
+        ->merge( repair_fleet( $gamma_fleet ) )
+```
+
+Or if we need to repair an entire empire of fleets:
+
+```perl
+    portal( map { repair_fleet( $_ ) } @fleets )
+```
+
+The sky's the limit!
+
+## Learn more about portals
 
 You can write most of your Portal code using the techniques described
 in this tutorial. There are however a lot more functions available in
