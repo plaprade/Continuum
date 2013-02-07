@@ -13,88 +13,34 @@ use base 'Exporter';
 
 our @EXPORT = (qw(
     portal
-    continuum
-    break_continuum
     $jump
 ));
 
 our $jump;
 
-# Build a Continuum::Portal from a chain of callbacks (continuums)
-sub portal(;&@) {
+# Build a Continuum::Portal from condition variables,
+# from a callback or from other portals
+sub portal {
+    my ( $x, @xs ) = @_;
 
-    my $portal = Continuum::Portal->new();
-    my $fp = undef;
-    my $caller = caller;
+    my $portal = Continuum::Portal->new;
 
-    # Traverse the function list backward and link them together
-    foreach my $f ( reverse @_ ) {
-        my $next = $fp; $fp = sub {
-
-            no strict 'refs';
-
-            # Localize $jump into the caller's namespace
-            local( *{ $caller . '::jump' } ) = \$next;
-
-            my ( $x, @xs ) = $f->( @_ );
-
-            # Break the function chain early with 
-            # a break_continuum() call
-            broken_continuum( $x ) and do {
-                $portal->send( $x->value );
-                return;
-            };
-
-            # If a function return a portal, connect it to the next
-            # function (continuum)
-            is_portal( $x ) and do {
-                $x->cb( sub {
-                    defined $next ?
-                        $next->( shift->recv ) :
-                        $portal->send( shift->recv );
-                });
-                return;
-            };
-
-            # If no portal is provided by a function in the chain,
-            # the user is expected to call $jump manually to make
-            # it to the next function. If we are at the end of the
-            # function chain, the portal is triggered and returned
-            $portal->send( $x, @xs )
-                unless defined $next;
-        };
+    # portal( sub { get( $key => $jump ) } )
+    if( defined $x && ref $x eq 'CODE' ){
+        no strict 'refs';
+        my $caller = caller;
+        # Localize $jump into the caller's namespace
+        local( *{ $caller . '::jump' } ) = \$portal;
+        $x->( @xs );
+        return $portal;
     }
 
-    # Allow the creation of an empty portal. This will simply
-    # trigger the portal and return it
-    defined $fp ?
-        $fp->() :
-        $portal->send();
-
-    $portal;
-}
-
-sub continuum(&@) { @_ }
-
-sub break_continuum {
-    Continuum::Broken->new( @_ );
-}
-
-package Continuum::Broken;
-
-sub new {
-    my $class = shift;
-    my $self = {
-        _value => [ @_ ],
-    };
-    bless $self, $class;
-}
-
-sub value {
-    my $self = shift;
-    wantarray ? 
-        @{ $self->{ _value } } : 
-        $self->{ _value }->[0];
+    # portal( $cv )
+    # portal( @cvs )
+    # portal( @portals )
+    # portal( map { cv( $_ ) } @values )
+    $portal->send;
+    $portal->merge( @_ );
 }
 
 1;

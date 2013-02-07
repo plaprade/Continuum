@@ -91,42 +91,85 @@ sub test_str {
 
 }
 
-### Concatenation - Append ###
+### Merge - Parallel execution flows ###
 
 is_deeply(
-    [ cv(2)->cons( cv(3) )->cons( 4 )->recv ],
-    [ 2, 3, 4 ],
-    'Cons',
+    [ cv(2)->merge(3)->recv ],
+    [ 2, 3 ],
+    'Merge scalar',
 );
 
 is_deeply(
-    [ cv(2)->cons( cv(3) )->cons( undef )->recv ],
-    [ 2, 3, undef ],
-    'Cons undef',
+    [ cv(2)->merge(anyevent_cv(4))->recv ],
+    [ 2, 4 ],
+    'Merge condition variable',
 );
 
 is_deeply(
-    [ cv(2)->append( cv(3), 4, cv(5) )->recv ],
-    [ 2, 3, 4, 5 ],
-    'Append',
+    [ cv(2)->merge(cv(5))->recv ],
+    [ 2, 5 ],
+    'Merge portal',
 );
 
 is_deeply(
-    [ cv(2)->append( cv(3), 4, cv(5), undef )->recv ],
-    [ 2, 3, 4, 5 ],
-    'Append undef',
+    [ cv(2)->merge( cv(3), 4, cv(5), anyevent_cv(6) )->recv ],
+    [ 2, 3, 4, 5, 6 ],
+    'Merge mix',
 );
 
 is_deeply(
-    [ cv( undef )->append( undef )->recv ],
-    [ undef ],
-    'Append double undef',
+    [ cv(2)->merge( cv(3), 4, anyevent_cv(5), undef )->recv ],
+    [ 2, 3, 4, 5, undef ],
+    'Merge mix undef',
 );
 
 is_deeply(
-    [ cv(2)->append( cv(3), undef, 4, cv(5), undef )->recv ],
-    [ 2, 3, undef, 4, 5 ],
-    'Append undef middle',
+    [ cv( undef )->merge( undef )->recv ],
+    [ undef, undef ],
+    'Merge double undef',
+);
+
+is_deeply(
+    [ cv(2)->merge( cv(3), undef, 4, cv(5), undef )->recv ],
+    [ 2, 3, undef, 4, 5, undef ],
+    'Merge undef middle',
+);
+
+
+is_deeply(
+    [ cv(2)->merge( cv(3), 4, '', anyevent_cv(5) )
+        ->merge( anyevent_cv(6) )->merge( 7, 8 )->recv ],
+    [ 2, 3, 4, '', 5, 6, 7, 8 ],
+    'Merge multiple calls',
+);
+
+is_deeply(
+    [ cv(1, 2)
+        ->merge( cv(3), 4, 5, anyevent_cv(6, 7, 8), 9 )->recv ],
+    [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    'Merge list'
+);
+
+is_deeply(
+    [ cv(2)->merge( undef, cv(3) )->merge( undef )->merge()
+        ->merge( undef, undef )->merge( anyevent_cv(4), undef )
+        ->merge( 5, undef )->recv ],
+    [ 2, undef, 3, undef, undef, undef, 4, undef, 5, undef ],
+    'Merge complex undef',
+);
+
+is_deeply(
+    [ cv(1, 2)
+        ->wait( 0.1 )
+        ->merge( 3 )
+        ->merge( cv(4), cv(undef)->wait(0.02) ) 
+        ->merge( cv(5)->wait(0.1), 6, '', undef, anyevent_cv(7) )
+        ->wait( 0.1 )
+        ->merge( cv(8)->wait(0.05), cv(9)->wait(0.03), 10, cv(undef) )
+        ->recv
+    ],
+    [ 1, 2, 3, 4, undef, 5, 6, '', undef, 7, 8, 9, 10, undef ],
+    'Merge with timers'
 );
 
 ### Continuation - Data dependencies ### 
@@ -368,43 +411,41 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv(1, 2)->shadow( 3, 4 )->cons( 5 )->recv ],
+    [ cv(1, 2)->shadow( 3, 4 )->merge( 5 )->recv ],
     [ 3, 4, 5 ],
     'Shadow scalar'
 );
 
 is_deeply(
-    [ cv(1, 2)->shadow( cv( 3, 4 ) )->cons( 5 )->recv ],
+    [ cv(1, 2)->shadow( cv( 3, 4 ) )->merge( 5 )->recv ],
     [ 3, 4, 5 ],
     'Shadow condvar'
 );
 
 is_deeply(
-    [ portal->wait( 0.1 )->then( sub { cv( 3, 4, ) } )
+    [ portal->wait( 0.1 )->then( sub { cv( 3, 4 ) } )
         ->wait( 0.1 )->shadow( cv( 1, 2 ) )->recv ],
     [ 1, 2 ],
     'Shadow wait'
 );
 
 is_deeply(
-    [ ( portal { 
-        my $cv = AnyEvent->condvar; 
+    [ portal( sub { 
+        my $jump = $jump; #Lexical variable
         my $w; $w = AnyEvent->timer( after => 0.05, cb => sub {
             undef $w;
-            $cv->send( 1, 2 );
+            $jump->( 1, 2 );
         });
-        $cv;
     } )->shadow( 
-        portal {
-            my $cv = AnyEvent->condvar; 
+        portal( sub {
+            my $jump = $jump; #Lexical variable
             my $w; $w = AnyEvent->timer( after => 0.1, cb => sub {
                 undef $w;
-                $cv->send( 3, 4 );
+                $jump->( 4, 5 );
             });
-            $cv;
-        }
+        })
     )->recv ],
-    [ 3, 4 ],
+    [ 4, 5 ],
     'Shadow portal wait'
 );
 
@@ -421,7 +462,7 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv(2)->cons( cv(3) )->wait( 0.1 )->cons( cv(4) )->recv ],
+    [ cv(2)->merge( cv(3) )->wait( 0.1 )->merge( cv(4) )->recv ],
     [ 2, 3, 4 ],
     'Wait',
 );
@@ -435,119 +476,123 @@ is_deeply(
 );
 
 is_deeply(
-    [ ( portal { 2 } )->recv ],
+    [ portal( 2 )->recv ],
     [ 2 ],
     'portal single scalar'
 );
 
 is_deeply(
-    [ ( portal { break_continuum(2) } )->recv ],
-    [ 2 ],
-    'portal single result'
-);
-
-is_deeply(
-    [( 
-        portal { 
-            $jump->(1); 
-        } continuum {
-            $jump->( @_, 2 );
-        } continuum {
-            ( @_, 3 );
-        }
-    )->recv],
+    [ portal( 1, 2, 3 )->recv ],
     [ 1, 2, 3 ],
-    'portal chain'
+    'portal array'
 );
 
 is_deeply(
-    [( 
-        portal { 
-            $jump->(1); 
-        } continuum {
-            break_continuum( @_, 4 );
-        } continuum {
-            ( @_, 3 );
-        }
-    )->recv],
-    [ 1, 4 ],
-    'portal early return'
-);
-
-is_deeply(
-    [ ( portal { cv() } )->recv ],
+    [ portal( cv() )->recv ],
     [],
-    'portal empty cv'
+    'portal empty portal'
 );
 
 is_deeply(
-    [ ( portal { cv( 1, 2 ) } )->recv ],
+    [ portal( cv( 3 ) )->recv ],
+    [ 3 ],
+    'portal single portal value'
+);
+
+is_deeply(
+    [ portal( cv( 1, 2 ) )->recv ],
     [ 1, 2 ],
-    'portal cv'
+    'portal list portal values'
 );
 
 is_deeply(
-    [( portal { anyevent_cv() } )->recv],
+    [ portal( cv( 1, 2 ), cv(), cv( 5, 6 ), cv( 7 ) )->recv ],
+    [ 1, 2, 5, 6, 7 ],
+    'portal list portals'
+);
+
+is_deeply(
+    [ portal( anyevent_cv() )->recv ],
     [],
     'portal empty anyevent'
 );
 
 is_deeply(
-    [( portal { anyevent_cv( 2 ) } )->recv],
+    [ portal( anyevent_cv( 2 ) )->recv],
     [ 2 ],
-    'portal simple anyevent'
+    'portal simple anyevent value'
 );
 
 is_deeply(
-    [( portal { anyevent_cv( 1, 2, 3 ) } )->recv],
+    [ portal( anyevent_cv( 1, 2, 3 ) )->recv],
     [ 1, 2, 3 ],
-    'portal list anyevent'
+    'portal list anyevent values'
 );
 
 is_deeply(
-    [( 
-        portal { 
-            anyevent_cv( 1, 2, 3 ) 
-        } continuum {
-            anyevent_cv( @_, 4, 5, 6 ) 
-        } continuum {
-            ( @_, 7 );
-        }
-    )->recv],
-    [ 1, 2, 3, 4, 5, 6, 7 ],
-    'portal chain anyevent'
+    [ portal( 
+        anyevent_cv( 1 ), 
+        anyevent_cv(), 
+        anyevent_cv( 3, 4 ), 
+        anyevent_cv( 5, 6 ), 
+    )->recv ],
+    [ 1, 3, 4, 5, 6 ],
+    'portal list anyevent cvs'
 );
 
 is_deeply(
-    [( 
-        portal { 
-            anyevent_cv( 1, 2, 3 ) 
-        } continuum {
-            break_continuum( @_, 4, 5 );
-        } continuum {
-            ( @_, 7 );
-        }
-    )->recv],
-    [ 1, 2, 3, 4, 5 ],
-    'portal chain anyevent early return'
+    [ portal( undef )->recv ],
+    [ undef ],
+    'undef portal'
 );
 
 is_deeply(
-    [( 
-        portal { 
-            anyevent_cv( 1, 2, 3 ) 
-        } continuum {
-            $jump->( @_, 4, 5 );
-        } continuum {
-            cv( @_, 6 );
-        } continuum {
-            break_continuum( @_, 7 );
-        } continuum {
-            ( @_, 8 );
-        }
-    )->recv],
-    [ 1, 2, 3, 4, 5, 6, 7 ],
-    'portal chain mix'
+    [ portal( undef, undef, undef )->recv ],
+    [ undef, undef, undef ],
+    'triple undef portal'
+);
+
+is_deeply(
+    [ portal( 
+        anyevent_cv( 1 ), 
+        ( 2, 3 ),
+        cv(),
+        undef,
+        3.5,
+        cv( 4, undef, 5 ),
+        anyevent_cv( 6, undef ),
+        cv( 7 )->wait( 0.1 ),
+        undef,
+        cv( undef )->wait( 0.1 ),
+    )->recv ],
+    [ 1, 2, 3, undef, 3.5, 4, undef, 
+        5, 6, undef, 7, undef, undef ],
+    'portal mix'
+);
+
+is_deeply(
+    [ portal( sub { $jump->( 1, 2, undef, 3, undef ) } )->recv ],
+    [ 1, 2, undef, 3, undef ],
+    'portal coderef'
+);
+
+is_deeply(
+    [ portal( sub { 
+        my $jump = $jump; #Lexical variable
+        cv()->wait( 0.1 )->then( sub {
+            $jump->( undef, 4, 5, undef ) 
+        }) 
+    } )->recv ],
+    [ undef, 4, 5, undef ],
+    'portal coderef wait'
+);
+
+is_deeply(
+    [ portal( sub { 
+        cv( 7, 8, undef )->wait( 0.1 )->then( $jump ) 
+    } )->recv ],
+    [ 7, 8, undef ],
+    'portal coderef wait 2'
 );
 
 done_testing();

@@ -73,7 +73,7 @@ Continuum::Portal - Asynchronous continuation framework for Perl
 sub _op2 {
     my ( $op, $self, $other, $swap ) = @_;
 
-    $self->cons( $other )->then( sub {
+    $self->merge( $other )->then( sub {
         my ( $a, $b ) = @_;
         my $stm = $swap ?
             '$b ' . $op . ' $a' :
@@ -96,26 +96,27 @@ sub _op1 {
     });
 }
 
-### Concatenation - Append ###
+### Merge - for merging parallel execution paths ###
 
-sub cons {
-    my ( $self, $other ) = @_;
-    my $portal = Continuum::Portal->new;
+sub merge {
+    my $self = shift;
+
+    return $self unless scalar @_;
+
+    my ( $x, @xs ) = @_;
+    my $portal = Continuum::Portal->new; 
+
     $self->cb( sub {
         my @left = shift->recv;
-        is_portal( $other ) ?
-            $other->cb( sub {
+        is_portal( $x ) ?
+            $x->cb( sub {
                 $portal->send( @left, shift->recv );
             }) :
-            $portal->send( @left, $other );
+            $portal->send( @left, $x );
     });
-    $portal;
-}
 
-sub append {
-    my ( $self, $x, @xs ) = @_;
-    return $self unless defined $x || @xs;
-    $self->cons( $x )->append( @xs );
+    $portal->merge( @xs );
+    
 }
 
 ### Continuation - Data dependencies ###
@@ -126,7 +127,7 @@ sub then {
     $self->cb( sub {
         my $inner = Continuum::Portal->new; 
         $inner->send();
-        $inner->append( $cb->( shift->recv ) )->cb( sub {
+        $inner->merge( $cb->( shift->recv ) )->cb( sub {
             $portal->send( shift->recv );
         });
     });
@@ -136,7 +137,7 @@ sub then {
 ### List operations ###
 
 sub push : method {
-    shift->append( @_ );
+    shift->merge( @_ );
 }
 
 sub pop : method {
@@ -212,7 +213,7 @@ sub grep : method {
     $self->map( sub {
         my $portal = Continuum::Portal->new;
         $portal->send();
-        $portal->cons( $fn->() )->then( sub {
+        $portal->merge( $fn->() )->then( sub {
             [ $_, shift ]
         });
     })->then( sub {
