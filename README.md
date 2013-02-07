@@ -86,7 +86,7 @@ a functionally equivalent manner as:
     use Continuum;
 
     sub assemble_squad {
-        portal( map{ $fleet->find( $_ ) } @_ );
+        portal( map { $fleet->find( $_ ) } @_ );
     }
 
     # Usage
@@ -258,18 +258,18 @@ It works by passing a function to `portal` in which you can make your
 call to your callback-oriented API. Inside the function, you have
 access to the `$jump` variable which is equal to the Portal returned
 by the `portal` call. This allows you to pass it as a code reference
-to your callback API, or call `$jump-`send(...)> manually when you
+to your callback API, or call `$jump->send(...)` manually when you
 are ready to send data through your Portal. Let's demonstrate that
 second case:
 
 ```perl
     portal( sub {
-        my $jump = $jump; # Create lexical variable
+        my $jump = $jump; # Create a lexical copy
         $redis->get( $key => sub {
             my ( $redis, $value ) = @_;
             # Equivalent to $jump->send( $value )
             $jump->( $value ); # Trigger the Portal
-        });
+        })
     })
 ```
 
@@ -284,14 +284,14 @@ can easily access to Portal API:
         portal( sub { 
             my $jump = $jump;
             $redis->get( $key => sub { $jump->( $_[1] ) } ) 
-        });
+        })
     }
 
     # Use your new Portal function
     portal_get( $key1 )->merge( portal_get( $key2 ) )
         ->then( sub {
             my ( $value1, $value2 ) = @_;
-        });
+        })
 ```
 
 We can even process lists of keys in this way
@@ -301,7 +301,7 @@ We can even process lists of keys in this way
         ->then( sub {
             my @values = @_;
             ...
-        });
+        })
 ```
 
 This last example demonstrates the last case of the `portal`
@@ -314,9 +314,9 @@ capture the results in a callback.
 While I still have your attention, let's work our way through a last
 example to build on the concepts we have just learned. Let's assume we
 have access to a callback-oriented `$fleet` API and we want to write
-a little program that can find all the ships with repair capability in
-the fleet. We then want to find all the damaged ships in our fleet and
-have them repaired by our repair ships. 
+a little program that can find all the ships with repair capabilities
+in the fleet and all damaged ships. We them have all the damaged ships
+repaired by the repairer ships.
 
 ```perl
     use Continuum;
@@ -328,7 +328,7 @@ have them repaired by our repair ships.
             # and filter the portal results by ship type
             ->grep( sub { $_->type eq $type } )
             # Return a reference through the portal
-            ->then( sub { \@_ } );
+            ->then( sub { \@_ } )
     }
 
     sub repair_fleet {
@@ -339,8 +339,8 @@ have them repaired by our repair ships.
                 my ( $repairer, $damaged ) = @_; 
                 portal( sub {
                     $fleet->repair( $repairer, $damaged, $jump )
-                });
-            });
+                })
+            })
     }
 ```
 
