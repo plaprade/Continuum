@@ -2,6 +2,7 @@ Changes
 Makefile.PL
 MANIFEST
 UNLICENSE
+README.md
 t/Continuum.t
 lib/Continuum.pm
 lib/Continuum/Portal.pm
