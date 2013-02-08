@@ -376,7 +376,7 @@ Please report any bugs in the projects bug tracker:
 
 [http://github.com/ciphermonk/Continuum/issues](http://github.com/ciphermonk/Continuum/issues)
 
-You can also provide a fix by contributing to the project:
+You can also submit a patch.
 
 ## Contributing
 
