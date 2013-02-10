@@ -392,14 +392,14 @@ documentation.
 Install AnyEvent from CPAN or your distribution repositories by using one of
 these lines:
 
-    # sh
+    # lang:sh
     apt-get install libanyevent-perl
     yum install perl-AnyEvent
     cpan install AnyEvent
 
 Download and install Continuum
 
-    # sh
+    # lang:sh
     git clone https://github.com/ciphermonk/Continuum.git
     cd Continuum
     perl Makefile.PL && make && sudo make install

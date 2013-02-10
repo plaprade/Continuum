@@ -16,7 +16,7 @@ my $codefirst = qr/\s{4}\S.*/;
 my $code = qr/\s{4}.*/;
 $text =~ s{
     \n
-    (?:\s{4}\#\s*(?<lang>\S+)\s*)
+    (?:\s{4}\#\s*lang:\s*(?<lang>\S+)\s*\n)?
     (?<code>
             $codefirst\n
             (?:$code\n|\s*\n)*
