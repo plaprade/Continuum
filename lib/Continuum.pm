@@ -393,9 +393,9 @@ Install AnyEvent from CPAN or your distribution repositories by using one of
 these lines:
 
     # lang:sh
-    apt-get install libanyevent-perl
-    yum install perl-AnyEvent
-    cpan install AnyEvent
+    apt-get install libanyevent-perl   # Debian/Ubuntu
+    yum install perl-AnyEvent          # RedHat/Fedora
+    cpan install AnyEvent              # CPAN (any)
 
 Download and install Continuum
 
