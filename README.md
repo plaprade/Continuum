@@ -33,7 +33,6 @@ differences and advantages of Continuum. Let's assume we have access
 to an asynchronous `$fleet` API that returns [AnyEvent](http://search.cpan.org/perldoc?AnyEvent) condition
 variables:
 
-```perl
     use AnyEvent;
 
     sub assemble_squad {
@@ -64,7 +63,6 @@ variables:
     )->cb( sub {
         my %squad = shift->recv;
     });
-```
 
 This is the traditional way of building condition variables. You set your
 callback in the first `being` call. This will be triggered when all the
@@ -82,14 +80,13 @@ might be fine for small projects but becomes rapidly unmaintainable for
 non-trivial code bases.  Continuum allows you to rewrite the above example in
 a functionally equivalent manner as:
 
-```perl
     use Continuum;
 
     sub assemble_squad {
         portal( map { $fleet->find( $_ ) } @_ );
     }
 
-    # Usage
+```Usage
     assemble_squad(
         'Millennium Falcon',
         'USS Enterprise',
@@ -115,13 +112,11 @@ Portal API. We will have a look at it now. Let's assume our `$fleet`
 API is Portal-enabled and returns portals for all of its calls. We
 could selectively find individual ships in parallel:
 
-```perl
     $fleet->find( 'Millennium Falcon' ) 
         ->merge( $fleet->find( 'USS Enterprise' ) )
         ->then( sub {
             my @ships = @_;
         });
-```
 
 `merge` essentially creates a new Portal that will deliver the
 results of it's input portals when all of them are ready. It executes
@@ -169,7 +164,6 @@ can repair a ship. It needs to find the ship, repair it and put it
 back into the fleet. These 3 actions are provided by the `$fleet` API
 which is Portal-enabled.
 
-```perl
     # Returns a Portal
     sub find_and_repair {
         my $ship = shift;
@@ -177,7 +171,6 @@ which is Portal-enabled.
             ->then( sub { $fleet->repair( shift ) } )
             ->then( sub { $fleet->put( shift ) } );
     }
-```
 
 We have data dependencies between our 3 asynchronous operations and
 can not process them in parallel (we actually need to find a ship
@@ -187,23 +180,18 @@ necessary transformations to our ship.
 Nothing prevents us, however, from finding and repairing multiple
 ships in parallel:
 
-```perl
     find_and_repair( 'Millennium Falcon' )->merge( 
         find_and_repair( 'USS Enterprise' ) 
         find_and_repair( 'Destiny' ) 
     )
-```
 
 We can even repair a whole fleet of ships in parallel:
 
-```perl
     portal( map { find_and_repair( $_ ) } @ships )
-```
 
 We could also have implemented the find and repair algorithm
 differently, using the `map` function from the Portal API:
 
-```perl
     sub find_and_repair {
         my @ships = @_;
         portal( @ships )
@@ -211,7 +199,6 @@ differently, using the `map` function from the Portal API:
             ->map( sub { $fleet->repair( $_ ) } )
             ->map( sub { $fleet->put( $_ ) } );
     }
-```
 
 We start by creating a new Portal containing all the ships. Then we
 map them through 3 portals that respectively finds the ships, repairs
@@ -229,9 +216,7 @@ between traditional asynchronous methods (condition variables and
 callbacks) and the Portal world. We already saw how to create a Portal
 from a condition variable earlier in this tutorial.
 
-```perl
     portal( @condition_variables )
-```
 
 This creates a Portal that merges the results of all the input
 condition variables together and returns them when they are all
@@ -239,20 +224,16 @@ available. The condition variables execute in parallel.  If you are
 working with a condition variable API, it is easy to use them to
 access the Portal API:
 
-```perl
     portal( $db->get( $key1 ), $db->get( $key2 ) )
         ->then( sub { 
             my ( $value1, $value2 ) = @_;
             ...
         })
-```
 
 We also provide an easy way to create Portals from a callback oriented
 API (like [Mojo::Redis](http://search.cpan.org/perldoc?Mojo::Redis)):
 
-```perl
     portal( sub { $redis->get( $key => $jump ) } )
-```
 
 It works by passing a function to `portal` in which you can make your
 call to your callback-oriented API. Inside the function, you have
@@ -262,7 +243,6 @@ to your callback API, or call `$jump->send(...)` manually when you
 are ready to send data through your Portal. Let's demonstrate that
 second case:
 
-```perl
     portal( sub {
         my $jump = $jump; # Create a lexical copy
         $redis->get( $key => sub {
@@ -271,13 +251,11 @@ second case:
             $jump->( $value ); # Trigger the Portal
         })
     })
-```
 
 Because `$jump` is a local variable, we need to create a lexical
 equivalent to access it from the Redis callback. Using this style, we
 can easily access to Portal API:
 
-```perl
     # Prepare the Portal
     sub portal_get {
         my $key = shift;
@@ -292,17 +270,14 @@ can easily access to Portal API:
         ->then( sub {
             my ( $value1, $value2 ) = @_;
         })
-```
 
 We can even process lists of keys in this way
 
-```perl
     portal( map { portal_get( $_ ) } @keys )
         ->then( sub {
             my @values = @_;
             ...
         })
-```
 
 This last example demonstrates the last case of the `portal`
 function. It also accepts lists of Portals and will process them in
@@ -318,7 +293,6 @@ a little program that can find all the ships with repair capabilities
 in the fleet and all damaged ships. We them have all the damaged ships
 repaired by the repairer ships.
 
-```perl
     use Continuum;
 
     sub fleet_find {
@@ -342,22 +316,17 @@ repaired by the repairer ships.
                 })
             })
     }
-```
 
 With these functions, we have the possibility of repairing a complete
 fleet of ships! If we have multiple fleets under our command, it is
 easy to repair them all in parallel:
 
-```perl
     repair_fleet( $alpha_fleet )
         ->merge( repair_fleet( $gamma_fleet ) )
-```
 
 Or if we need to repair an entire empire of fleets:
 
-```perl
     portal( map { repair_fleet( $_ ) } @fleets )
-```
 
 The sky's the limit!
 
@@ -369,6 +338,25 @@ the Portal API. Feel free to head to the wiki for additional
 documentation.
 
 ( TODO ... )
+
+## Installing Continuum
+
+Install AnyEvent from CPAN or your distribution repositories by using one of
+these lines:
+
+```sh
+    apt-get install libanyevent-perl
+    yum install perl-AnyEvent
+    cpan install AnyEvent
+```
+
+Download and install Continuum
+
+```sh
+    git clone https://github.com/ciphermonk/Continuum.git
+    cd Continuum
+    perl Makefile.PL && make && sudo make install
+```
 
 ## Bugs
 
