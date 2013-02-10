@@ -370,6 +370,25 @@ documentation.
 
 ( TODO ... )
 
+## Installing Continuum
+
+Install AnyEvent from CPAN or your distribution repositories by using one of
+these lines:
+
+```sh
+    apt-get install libanyevent-perl   # Debian/Ubuntu
+    yum install perl-AnyEvent          # RedHat/Fedora
+    cpan install AnyEvent              # CPAN (any)
+```
+
+Download and install Continuum
+
+```sh
+    git clone https://github.com/ciphermonk/Continuum.git
+    cd Continuum
+    perl Makefile.PL && make && sudo make install
+```
+
 ## Bugs
 
 Please report any bugs in the projects bug tracker:
