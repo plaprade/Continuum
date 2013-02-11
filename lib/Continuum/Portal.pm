@@ -99,24 +99,35 @@ sub _op1 {
 ### Merge - for merging parallel execution paths ###
 
 sub merge {
-    my $self = shift;
+    my ( $self, @args ) = @_;
 
-    return $self unless scalar @_;
-
-    my ( $x, @xs ) = @_;
+    my ( @left, @right );
     my $portal = Continuum::Portal->new; 
 
-    $self->cb( sub {
-        my @left = shift->recv;
-        is_portal( $x ) ?
-            $x->cb( sub {
-                $portal->send( @left, shift->recv );
-            }) :
-            $portal->send( @left, $x );
+    $portal->begin( sub { 
+        shift->send( @left, map { @$_ } @right ) 
     });
 
-    $portal->merge( @xs );
-    
+    $self->cb( sub {
+        @left = shift->recv;
+        
+        # Use indices to preserve ordering in @right
+        for my $i ( 0..$#args ){
+            if( is_portal( $args[$i] ) ){
+                $portal->begin;
+                $args[$i]->cb( sub {
+                    $right[$i] = [ shift->recv ];
+                    $portal->end;
+                });
+            } else {
+                $right[$i] = [ $args[$i] ];
+            }
+        }
+
+        $portal->end;
+    });
+
+    $portal;
 }
 
 ### Continuation - Data dependencies ###
