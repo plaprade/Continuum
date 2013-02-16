@@ -60,14 +60,6 @@ use overload (
     ),
 );
 
-=pod
-
-=head1 NAME
-
-Continuum::Portal - Asynchronous continuation framework for Perl
-
-=cut
-
 ### Basic Perl operator overload ###
 
 sub _op2 {
