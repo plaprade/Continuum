@@ -175,14 +175,6 @@ sub aset {
     });
 }
 
-sub first {
-    shift->aget( 0 );
-}
-
-sub last {
-    shift->aget( -1 );
-}
-
 ### Get/Set Hash elements ###
 
 sub hget {
@@ -223,6 +215,38 @@ sub grep : method {
         map { $_->[0] }
             grep { $_->[1] } @_;
     });
+}
+
+sub first : method {
+    my ( $self, $fn ) = @_;
+    $self->then( sub {
+        my $portal = Continuum::Portal->new;
+        _first( $fn, $portal, @_ );
+        $portal;
+    });
+}
+
+sub _first {
+    my ( $fn, $portal, @vals ) = @_;
+
+    @vals or do {
+        $portal->send;
+        return;
+    };
+
+    my ( $x, @xs ) = @vals;
+
+    my $res = do { local $_ = $x; $fn->() };
+
+    is_portal( $res ) ?
+        $res->cb( sub {
+            my $bool = shift->recv;
+            $bool ? $portal->send( $x ) :
+                _first( $fn, $portal, @xs ); 
+
+        }) : 
+        $res ? $portal->send( $x ) :
+            _first( $fn, $portal, @xs );
 }
 
 sub sort : method {
@@ -310,6 +334,14 @@ sub pop_stash {
 }
 
 ### MISC Operators ###
+
+sub persist {
+    my $self = shift;
+    my $guard; $guard = $self->then( sub {
+        undef $guard;
+        @_;
+    });
+}
 
 sub deref {
     my $self = shift;

@@ -238,18 +238,6 @@ is_deeply(
     'Array Set'
 );
 
-is_deeply(
-    [ cv( 4, 2, 3 )->first->recv ],
-    [ 4 ],
-    'First'
-);
-
-is_deeply(
-    [ cv( 4, 2, 3 )->last->recv ],
-    [ 3 ],
-    'Last'
-);
-
 ### Get/Set Hash elements ###
 
 is_deeply(
@@ -281,9 +269,51 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv( 1, 2, 3 )->map( sub{ cv( $_ * 2 ) } )->recv ],
+    [ cv( 1, 2, 3 )->map( sub{ 
+        my $x = $_;
+        cv( $x * 2 ); 
+    } )->recv ],
     [ 2, 4, 6 ],
-    'Flatmap (with map)'
+    'Map Portal'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3 )->map( sub{ 
+        my $x = $_;
+        anyevent_cv( $x * 3 ); 
+    } )->recv ],
+    [ 3, 6, 9 ],
+    'Map Condvar'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->first( sub { $_ == 3 } )->recv ],
+    [ 3 ],
+    'First'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->first( sub { $_ % 2 } )->recv ],
+    [ 1 ],
+    'First bis'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->first( sub { 
+        my $x = $_; 
+        cv( $x == 3 );
+    } )->recv ],
+    [ 3 ],
+    'First Portal'
+);
+
+is_deeply(
+    [ cv( 1, 2, 3, 4 )->first( sub { 
+        my $x = $_; 
+        anyevent_cv( $x == 4 );
+    } )->recv ],
+    [ 4 ],
+    'First Condvar'
 );
 
 is_deeply(
@@ -293,9 +323,12 @@ is_deeply(
 );
 
 is_deeply(
-    [ cv( 1, 2, 3, 4 )->grep( sub{ cv( $_ % 2 ) } )->recv ],
+    [ cv( 1, 2, 3, 4 )->grep( sub{ 
+        my $x = $_;
+        cv( $x % 2 ) 
+    } )->recv ],
     [ 1, 3 ],
-    'Flatgrep (with grep)'
+    'Grep Portal'
 );
 
 is_deeply(
