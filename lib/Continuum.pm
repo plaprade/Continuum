@@ -11,10 +11,7 @@ use version; our $VERSION = version->declare("v0.0.3");
 
 use base 'Exporter';
 
-our @EXPORT = (qw(
-    portal
-    $jump
-));
+our @EXPORT = qw( portal $jump );
 
 our $jump;
 
@@ -26,11 +23,11 @@ sub portal {
     my $portal = Continuum::Portal->new;
 
     # portal( sub { get( $key => $jump ) } )
-    if( defined $x && ref $x eq 'CODE' ){
+    if ( defined $x && ref $x eq 'CODE' ) {
         no strict 'refs';
         my $caller = caller;
         # Localize $jump into the caller's namespace
-        local( *{ $caller . '::jump' } ) = \$portal;
+        local ( *{ $caller . '::jump' } ) = \$portal;
         $x->( @xs );
         return $portal;
     }
@@ -90,14 +87,14 @@ variables:
 
         $cv->begin( sub {
             shift->send( %squad );
-        });
+        } );
 
-        foreach my $ship ( @_ ){
+        foreach my $ship ( @_ ) {
             $cv->begin;
             $fleet->find( $ship )->cb( sub {
                 $squad{ $ship } = shift->recv;
                 $cv->end;
-            });
+            } );
         }
 
         $cv->end;
@@ -111,7 +108,7 @@ variables:
         'Destiny',   
     )->cb( sub {
         my %squad = shift->recv;
-    });
+    } );
 
 This is the traditional way of building condition variables. You set your
 callback in the first C<being> call. This will be triggered when all the
@@ -140,9 +137,7 @@ a functionally equivalent manner as:
         'Millennium Falcon',
         'USS Enterprise',
         'Destiny',   
-    )->then( sub {
-        my %squad = @_;
-    });
+    )->then( sub { my %squad = @_ } );
 
 Much shorter and (hopefully) easier to understand.
 
@@ -162,9 +157,7 @@ could selectively find individual ships in parallel:
 
     $fleet->find( 'Millennium Falcon' ) 
         ->merge( $fleet->find( 'USS Enterprise' ) )
-        ->then( sub {
-            my @ships = @_;
-        });
+        ->then( sub { my @ships = @_ } );
 
 C<merge> essentially creates a new Portal that will deliver the
 results of it's input portals when all of them are ready. It executes
@@ -231,7 +224,7 @@ ships in parallel:
     find_and_repair( 'Millennium Falcon' )->merge( 
         find_and_repair( 'USS Enterprise' ) 
         find_and_repair( 'Destiny' ) 
-    )
+    );
 
 We can even repair a whole fleet of ships in parallel:
 
@@ -276,12 +269,12 @@ access the Portal API:
         ->then( sub { 
             my ( $value1, $value2 ) = @_;
             ...
-        })
+        } );
 
 We also provide an easy way to create Portals from a callback oriented
 API (like L<Mojo::Redis>):
 
-    portal( sub { $redis->get( $key => $jump ) } )
+    portal( sub { $redis->get( $key => $jump ) } );
 
 It works by passing a function to C<portal> in which you can make your
 call to your callback-oriented API. Inside the function, you have
@@ -297,8 +290,8 @@ second case:
             my ( $redis, $value ) = @_;
             # Equivalent to $jump->send( $value )
             $jump->( $value ); # Trigger the Portal
-        })
-    })
+        } );
+    } );
 
 Because C<$jump> is a local variable, we need to create a lexical
 equivalent to access it from the Redis callback. Using this style, we
@@ -310,14 +303,15 @@ can easily access to Portal API:
         portal( sub { 
             my $jump = $jump;
             $redis->get( $key => sub { $jump->( $_[1] ) } ) 
-        })
+        } );
     }
 
     # Use your new Portal function
     portal_get( $key1 )->merge( portal_get( $key2 ) )
         ->then( sub {
             my ( $value1, $value2 ) = @_;
-        })
+            ...
+        } );
 
 We can even process lists of keys in this way
 
@@ -325,7 +319,7 @@ We can even process lists of keys in this way
         ->then( sub {
             my @values = @_;
             ...
-        })
+        } );
 
 This last example demonstrates the last case of the C<portal>
 function. It also accepts lists of Portals and will process them in
@@ -350,7 +344,7 @@ repaired by the repairer ships.
             # and filter the portal results by ship type
             ->grep( sub { $_->type eq $type } )
             # Return a reference through the portal
-            ->then( sub { \@_ } )
+            ->then( sub { \@_ } );
     }
 
     sub repair_fleet {
@@ -361,8 +355,8 @@ repaired by the repairer ships.
                 my ( $repairer, $damaged ) = @_; 
                 portal( sub {
                     $fleet->repair( $repairer, $damaged, $jump )
-                })
-            })
+                } );
+            } );
     }
 
 With these functions, we have the possibility of repairing a complete
@@ -370,11 +364,11 @@ fleet of ships! If we have multiple fleets under our command, it is
 easy to repair them all in parallel:
 
     repair_fleet( $alpha_fleet )
-        ->merge( repair_fleet( $gamma_fleet ) )
+        ->merge( repair_fleet( $gamma_fleet ) );
 
 Or if we need to repair an entire empire of fleets:
 
-    portal( map { repair_fleet( $_ ) } @fleets )
+    portal( map { repair_fleet( $_ ) } @fleets );
 
 The sky's the limit!
 
