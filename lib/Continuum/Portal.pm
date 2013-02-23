@@ -259,11 +259,11 @@ sub sort : method {
     $self->then( sub {
         no strict 'refs';
         defined $fn ? sort { 
-                $caller ne 'Continuum::Portal'
-                    and local( *{ $caller . '::a' } ) = \$a
-                    and local( *{ $caller . '::b' } ) = \$b;
-                $fn->(); 
-            } @_ : sort @_;
+            $caller ne 'Continuum::Portal'
+                and local( *{ $caller . '::a' } ) = \$a
+                and local( *{ $caller . '::b' } ) = \$b;
+            $fn->(); 
+        } @_ : sort @_;
     } );
 }
 
