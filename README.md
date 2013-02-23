@@ -42,14 +42,14 @@ variables:
 
         $cv->begin( sub {
             shift->send( %squad );
-        });
+        } );
 
-        foreach my $ship ( @_ ){
+        foreach my $ship ( @_ ) {
             $cv->begin;
             $fleet->find( $ship )->cb( sub {
                 $squad{ $ship } = shift->recv;
                 $cv->end;
-            });
+            } );
         }
 
         $cv->end;
@@ -63,7 +63,7 @@ variables:
         'Destiny',   
     )->cb( sub {
         my %squad = shift->recv;
-    });
+    } );
 ```
 
 This is the traditional way of building condition variables. You set your
@@ -94,9 +94,7 @@ a functionally equivalent manner as:
         'Millennium Falcon',
         'USS Enterprise',
         'Destiny',   
-    )->then( sub {
-        my %squad = @_;
-    });
+    )->then( sub { my %squad = @_ } );
 ```
 
 Much shorter and (hopefully) easier to understand.
@@ -118,9 +116,7 @@ could selectively find individual ships in parallel:
 ```perl
     $fleet->find( 'Millennium Falcon' ) 
         ->merge( $fleet->find( 'USS Enterprise' ) )
-        ->then( sub {
-            my @ships = @_;
-        });
+        ->then( sub { my @ships = @_ } );
 ```
 
 `merge` essentially creates a new Portal that will deliver the
@@ -191,7 +187,7 @@ ships in parallel:
     find_and_repair( 'Millennium Falcon' )->merge( 
         find_and_repair( 'USS Enterprise' ) 
         find_and_repair( 'Destiny' ) 
-    )
+    );
 ```
 
 We can even repair a whole fleet of ships in parallel:
@@ -244,14 +240,14 @@ access the Portal API:
         ->then( sub { 
             my ( $value1, $value2 ) = @_;
             ...
-        })
+        } );
 ```
 
 We also provide an easy way to create Portals from a callback oriented
 API (like [Mojo::Redis](http://search.cpan.org/perldoc?Mojo::Redis)):
 
 ```perl
-    portal( sub { $redis->get( $key => $jump ) } )
+    portal( sub { $redis->get( $key => $jump ) } );
 ```
 
 It works by passing a function to `portal` in which you can make your
@@ -269,8 +265,8 @@ second case:
             my ( $redis, $value ) = @_;
             # Equivalent to $jump->send( $value )
             $jump->( $value ); # Trigger the Portal
-        })
-    })
+        } );
+    } );
 ```
 
 Because `$jump` is a local variable, we need to create a lexical
@@ -284,14 +280,15 @@ can easily access to Portal API:
         portal( sub { 
             my $jump = $jump;
             $redis->get( $key => sub { $jump->( $_[1] ) } ) 
-        })
+        } );
     }
 
     # Use your new Portal function
     portal_get( $key1 )->merge( portal_get( $key2 ) )
         ->then( sub {
             my ( $value1, $value2 ) = @_;
-        })
+            ...
+        } );
 ```
 
 We can even process lists of keys in this way
@@ -301,7 +298,7 @@ We can even process lists of keys in this way
         ->then( sub {
             my @values = @_;
             ...
-        })
+        } );
 ```
 
 This last example demonstrates the last case of the `portal`
@@ -328,7 +325,7 @@ repaired by the repairer ships.
             # and filter the portal results by ship type
             ->grep( sub { $_->type eq $type } )
             # Return a reference through the portal
-            ->then( sub { \@_ } )
+            ->then( sub { \@_ } );
     }
 
     sub repair_fleet {
@@ -339,8 +336,8 @@ repaired by the repairer ships.
                 my ( $repairer, $damaged ) = @_; 
                 portal( sub {
                     $fleet->repair( $repairer, $damaged, $jump )
-                })
-            })
+                } );
+            } );
     }
 ```
 
@@ -350,13 +347,13 @@ easy to repair them all in parallel:
 
 ```perl
     repair_fleet( $alpha_fleet )
-        ->merge( repair_fleet( $gamma_fleet ) )
+        ->merge( repair_fleet( $gamma_fleet ) );
 ```
 
 Or if we need to repair an entire empire of fleets:
 
 ```perl
-    portal( map { repair_fleet( $_ ) } @fleets )
+    portal( map { repair_fleet( $_ ) } @fleets );
 ```
 
 The sky's the limit!

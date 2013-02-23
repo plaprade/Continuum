@@ -30,20 +30,22 @@ our @ISA = qw( AnyEvent::CondVar );
 #
 
 use overload (
-    ( map { my $op = $_; $op => sub { _op2( $op, @_ ) }  }
-        ( 
+    (
+        map { my $op = $_; $op => sub { _op2( $op, @_ ) } } ( 
             qw( + - * / % ** << >> x . ),
             qw( < <= > >= == != ),
             qw( <=> cmp ),
             qw( lt le gt ge eq ne ),
             qw( & | ^ ),
             qw( ~~ ),
-        )),
-    ( map { my $op = $_; $op => sub { _op1( $op, @_ ) }  }
-        ( 
+        )
+    ),
+    (
+        map { my $op = $_; $op => sub { _op1( $op, @_ ) } } ( 
             qw( neg ! ~ ),
             qw( atan2 cos sin exp abs log sqrt int ),
-        ) ),
+        )
+    ),
     (
         '""' => sub {
             croak "Can't stringify Continuum::Portal. You probably "
@@ -71,9 +73,9 @@ sub _op2 {
             '$b ' . $op . ' $a' :
             '$a ' . $op . ' $b';
         my $res = eval( $stm );
-        carp "Error evaluating '$stm' : $@" if $@;
+        carp "Error evaluating '$stm': $@" if $@;
         $res;
-    });
+    } );
 }
 
 sub _op1 {
@@ -83,9 +85,9 @@ sub _op1 {
         my $a = shift;
         my $stm = $op . '$a';
         my $res = eval( $stm ); 
-        carp "Error evaluating '$stm' : $@" if $@;
+        carp "Error evaluating '$stm': $@" if $@;
         $res;
-    });
+    } );
 }
 
 ### Merge - for merging parallel execution paths ###
@@ -98,26 +100,26 @@ sub merge {
 
     $portal->begin( sub { 
         shift->send( @left, map { @$_ } @right ) 
-    });
+    } );
 
     $self->cb( sub {
         @left = shift->recv;
         
         # Use indices to preserve ordering in @right
-        for my $i ( 0..$#args ){
-            if( is_portal( $args[$i] ) ){
+        for my $i ( 0..$#args ) {
+            if ( is_portal( $args[$i] ) ) {
                 $portal->begin;
                 $args[$i]->cb( sub {
                     $right[$i] = [ shift->recv ];
                     $portal->end;
-                });
+                } );
             } else {
                 $right[$i] = [ $args[$i] ];
             }
         }
 
         $portal->end;
-    });
+    } );
 
     $portal;
 }
@@ -132,8 +134,8 @@ sub then {
         $inner->send();
         $inner->merge( $cb->( shift->recv ) )->cb( sub {
             $portal->send( shift->recv );
-        });
-    });
+        } );
+    } );
     $portal;
 }
 
@@ -163,7 +165,7 @@ sub aget {
     $self->then( sub {
         my @list = @_;
         map { $list[ $_ ] } @pos;
-    });
+    } );
 }
 
 sub aset {
@@ -172,7 +174,7 @@ sub aset {
         my @list = @_;
         $list[ $pos ] = $value;
         @list;
-    });
+    } );
 }
 
 ### Get/Set Hash elements ###
@@ -182,7 +184,7 @@ sub hget {
     $self->then( sub {
         my %h = @_;
         map { $h{ $_ } } @keys;
-    });
+    } );
 }
 
 sub hset {
@@ -191,7 +193,7 @@ sub hset {
         my %h = @_;
         $h{ $key } = $value;
         %h;
-    });
+    } );
 }
 
 ### Advanced List operations ###
@@ -200,7 +202,7 @@ sub map : method {
     my ( $self, $fn ) = @_;
     $self->then( sub {
         map { $fn->() } @_;
-    });
+    } );
 }
 
 sub grep : method {
@@ -210,11 +212,11 @@ sub grep : method {
         $portal->send();
         $portal->merge( $fn->() )->then( sub {
             [ $_, shift ]
-        });
-    })->then( sub {
+        } );
+    } )->then( sub {
         map { $_->[0] }
             grep { $_->[1] } @_;
-    });
+    } );
 }
 
 sub first : method {
@@ -223,7 +225,7 @@ sub first : method {
         my $portal = Continuum::Portal->new;
         _first( $fn, $portal, @_ );
         $portal;
-    });
+    } );
 }
 
 sub _first {
@@ -244,9 +246,9 @@ sub _first {
             $bool ? $portal->send( $x ) :
                 _first( $fn, $portal, @xs ); 
 
-        }) : 
-        $res ? $portal->send( $x ) :
-            _first( $fn, $portal, @xs );
+        } )
+        : $res ? $portal->send( $x )
+            : _first( $fn, $portal, @xs );
 }
 
 sub sort : method {
@@ -262,7 +264,7 @@ sub sort : method {
                     and local( *{ $caller . '::b' } ) = \$b;
                 $fn->(); 
             } @_ : sort @_;
-    });
+    } );
 }
 
 sub reduce : method {
@@ -278,14 +280,14 @@ sub reduce : method {
                 and local( *{ $caller . '::b' } ) = \$b;
             $fn->();
         } ( @acc, @_ );
-    });
+    } );
 }
 
 sub unique {
     my ( $self, $fn ) = @_;
     $self->then( sub {
         values %{{ map { $fn->() => $_ } @_ }};
-    });
+    } );
 }
 
 sub sum {
@@ -304,14 +306,14 @@ sub and : method {
     my ( $self, $cb ) = @_;
     $self->then( sub {
         $_[0] ? $cb->( @_ ) : @_;
-    });
+    } );
 }
 
 sub or : method {
     my ( $self, $cb ) = @_;
     $self->then( sub {
         $_[0] ? @_ : $cb->( @_ );
-    });
+    } );
 }
 
 ### Stash operations ###
@@ -323,14 +325,14 @@ sub push_stash {
     $self->then( sub {
         push @stash, \@_;
         @_;
-    });
+    } );
 }
 
 sub pop_stash {
     my $self = shift;
     $self->then( sub {
         @{ pop @stash };
-    });
+    } );
 }
 
 ### MISC Operators ###
@@ -340,19 +342,17 @@ sub persist {
     my $guard; $guard = $self->then( sub {
         undef $guard;
         @_;
-    });
+    } );
 }
 
 sub deref {
     my $self = shift;
     $self->then( sub {
         map {
-            ref $_ eq 'HASH' ?
-                %{ $_ } :
-                ref $_ eq 'ARRAY' ?
-                @{ $_ } : $_
+            ref $_ eq 'HASH' ? %{ $_ }
+                : ref $_ eq 'ARRAY' ?  @{ $_ } : $_
         } @_;
-    });
+    } );
 }
 
 sub shadow {
@@ -371,7 +371,7 @@ sub any {
             $portal->send( shift->recv );
             $pending = 0;
         }
-    });
+    } );
 
     is_portal( $other ) ?
         $other->cb( sub {
@@ -379,7 +379,7 @@ sub any {
                 $portal->send( shift->recv );
                 $pending = 0;
             }
-        }) : $portal->send( $other );
+        } ) : $portal->send( $other );
 
     $portal;
 }
@@ -394,8 +394,8 @@ sub wait {
         my $t; $t = AnyEvent->timer( after => $time, cb => sub {
             undef $t;
             $portal->send( @args );
-        });
-    });
+        } );
+    } );
 
     $portal;
 }
