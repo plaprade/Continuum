@@ -40,7 +40,7 @@ variables:
 ```perl
     use AnyEvent;
 
-    sub assemble\_squad {
+    sub assemble_squad {
         my %squad;
         my $cv = AnyEvent->condvar;
 
@@ -48,7 +48,7 @@ variables:
             shift->send( %squad );
         } );
 
-        foreach my $ship ( @\_ ) {
+        foreach my $ship ( @_ ) {
             $cv->begin;
             $fleet->find( $ship )->cb( sub {
                 $squad{ $ship } = shift->recv;
@@ -61,7 +61,7 @@ variables:
     }
 
     # Usage (non-blocking)
-    assemble\_squad(
+    assemble_squad(
         'Millennium Falcon',
         'USS Enterprise',
         'Destiny',   
@@ -89,16 +89,16 @@ a functionally equivalent manner as:
 ```perl
     use Continuum;
 
-    sub assemble\_squad {
-        portal( map { $fleet->find( $\_ ) } @\_ );
+    sub assemble_squad {
+        portal( map { $fleet->find( $_ ) } @_ );
     }
 
     # Usage
-    assemble\_squad(
+    assemble_squad(
         'Millennium Falcon',
         'USS Enterprise',
         'Destiny',   
-    )->then( sub { my %squad = @\_ } );
+    )->then( sub { my %squad = @_ } );
 ```
 
 Much shorter and (hopefully) easier to understand.
@@ -120,7 +120,7 @@ could selectively find individual ships in parallel:
 ```perl
     $fleet->find( 'Millennium Falcon' ) 
         ->merge( $fleet->find( 'USS Enterprise' ) )
-        ->then( sub { my @ships = @\_ } );
+        ->then( sub { my @ships = @_ } );
 ```
 
 `merge` essentially creates a new Portal that will deliver the
@@ -171,7 +171,7 @@ which is Portal-enabled.
 
 ```perl
     # Returns a Portal
-    sub find\_and\_repair {
+    sub find_and_repair {
         my $ship = shift;
         $fleet->find( $ship )
             ->then( sub { $fleet->repair( shift ) } )
@@ -188,28 +188,28 @@ Nothing prevents us, however, from finding and repairing multiple
 ships in parallel:
 
 ```perl
-    find\_and\_repair( 'Millennium Falcon' )->merge( 
-        find\_and\_repair( 'USS Enterprise' ) 
-        find\_and\_repair( 'Destiny' ) 
+    find_and_repair( 'Millennium Falcon' )->merge( 
+        find_and_repair( 'USS Enterprise' ) 
+        find_and_repair( 'Destiny' ) 
     );
 ```
 
 We can even repair a whole fleet of ships in parallel:
 
 ```perl
-    portal( map { find\_and\_repair( $\_ ) } @ships )
+    portal( map { find_and_repair( $_ ) } @ships )
 ```
 
 We could also have implemented the find and repair algorithm
 differently, using the `map` function from the Portal API:
 
 ```perl
-    sub find\_and\_repair {
-        my @ships = @\_;
+    sub find_and_repair {
+        my @ships = @_;
         portal( @ships )
-            ->map( sub { $fleet->find( $\_ ) } )
-            ->map( sub { $fleet->repair( $\_ ) } )
-            ->map( sub { $fleet->put( $\_ ) } );
+            ->map( sub { $fleet->find( $_ ) } )
+            ->map( sub { $fleet->repair( $_ ) } )
+            ->map( sub { $fleet->put( $_ ) } );
     }
 ```
 
@@ -230,7 +230,7 @@ callbacks) and the Portal world. We already saw how to create a Portal
 from a condition variable earlier in this tutorial.
 
 ```perl
-    portal( @condition\_variables )
+    portal( @condition_variables )
 ```
 
 This creates a Portal that merges the results of all the input
@@ -242,7 +242,7 @@ access the Portal API:
 ```perl
     portal( $db->get( $key1 ), $db->get( $key2 ) )
         ->then( sub { 
-            my ( $value1, $value2 ) = @\_;
+            my ( $value1, $value2 ) = @_;
             ...
         } );
 ```
@@ -266,7 +266,7 @@ second case:
     portal( sub {
         my $jump = $jump; # Create a lexical copy
         $redis->get( $key => sub {
-            my ( $redis, $value ) = @\_;
+            my ( $redis, $value ) = @_;
             # Equivalent to $jump->send( $value )
             $jump->( $value ); # Trigger the Portal
         } );
@@ -279,18 +279,18 @@ can easily access to Portal API:
 
 ```perl
     # Prepare the Portal
-    sub portal\_get {
+    sub portal_get {
         my $key = shift;
         portal( sub { 
             my $jump = $jump;
-            $redis->get( $key => sub { $jump->( $\_[1] ) } ) 
+            $redis->get( $key => sub { $jump->( $_[1] ) } ) 
         } );
     }
 
     # Use your new Portal function
-    portal\_get( $key1 )->merge( portal\_get( $key2 ) )
+    portal_get( $key1 )->merge( portal_get( $key2 ) )
         ->then( sub {
-            my ( $value1, $value2 ) = @\_;
+            my ( $value1, $value2 ) = @_;
             ...
         } );
 ```
@@ -298,9 +298,9 @@ can easily access to Portal API:
 We can even process lists of keys in this way
 
 ```perl
-    portal( map { portal\_get( $\_ ) } @keys )
+    portal( map { portal_get( $_ ) } @keys )
         ->then( sub {
-            my @values = @\_;
+            my @values = @_;
             ...
         } );
 ```
@@ -322,22 +322,22 @@ repaired by the repairer ships.
 ```perl
     use Continuum;
 
-    sub fleet\_find {
-        my ( $fleet, type ) = @\_;
+    sub fleet_find {
+        my ( $fleet, type ) = @_;
         # Create a portal returning all the ships
         portal( sub { $fleet->getall( $jump ) } )
             # and filter the portal results by ship type
-            ->grep( sub { $\_->type eq $type } )
+            ->grep( sub { $_->type eq $type } )
             # Return a reference through the portal
-            ->then( sub { \@\_ } );
+            ->then( sub { \@_ } );
     }
 
-    sub repair\_fleet {
+    sub repair_fleet {
         my $fleet = shift;
-        fleet\_find( $fleet => 'repair' )
-            ->merge( fleet\_find( $fleet => 'damaged' ) )
+        fleet_find( $fleet => 'repair' )
+            ->merge( fleet_find( $fleet => 'damaged' ) )
             ->then( sub {
-                my ( $repairer, $damaged ) = @\_; 
+                my ( $repairer, $damaged ) = @_; 
                 portal( sub {
                     $fleet->repair( $repairer, $damaged, $jump )
                 } );
@@ -350,14 +350,14 @@ fleet of ships! If we have multiple fleets under our command, it is
 easy to repair them all in parallel:
 
 ```perl
-    repair\_fleet( $alpha\_fleet )
-        ->merge( repair\_fleet( $gamma\_fleet ) );
+    repair_fleet( $alpha_fleet )
+        ->merge( repair_fleet( $gamma_fleet ) );
 ```
 
 Or if we need to repair an entire empire of fleets:
 
 ```perl
-    portal( map { repair\_fleet( $\_ ) } @fleets );
+    portal( map { repair_fleet( $_ ) } @fleets );
 ```
 
 The sky's the limit!
@@ -403,9 +403,9 @@ You can also submit a patch.
 We're glad you want to contribute! It's simple:
 
 - Fork the Continuum (and perhaps claim a nobel prize in physics)
-- Create a branch `git checkout -b my\_branch`
+- Create a branch `git checkout -b my_branch`
 - Commit your changes `git commit -am 'comments'`
-- Push the branch `git push origin my\_branch`
+- Push the branch `git push origin my_branch`
 - Open a pull request
 
 ## Supporting
