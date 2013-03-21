@@ -1,4 +1,8 @@
-## Continuum - A continuation framework for Mojo & AnyEvent
+# NAME
+
+Continuum - A continuation framework for Mojo & AnyEvent
+
+# DESCRIPTION
 
 Continuum is a continuation framework that attempts to bring a bit of
 sanity and fun into asynchronous programming. We try to both

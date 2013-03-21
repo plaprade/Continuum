@@ -44,7 +44,11 @@ sub portal {
 
 __END__
 
-=head2 Continuum - A continuation framework for Mojo & AnyEvent
+=head1 NAME
+
+Continuum - A continuation framework for Mojo & AnyEvent
+
+=head1 DESCRIPTION
 
 Continuum is a continuation framework that attempts to bring a bit of
 sanity and fun into asynchronous programming. We try to both
