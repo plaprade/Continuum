@@ -385,7 +385,7 @@ these lines:
 Download and install Continuum
 
 ```sh
-    git clone https://github.com/cpt-octofu/Continuum.git
+    git clone https://github.com/plaprade/Continuum.git
     cd Continuum
     perl Makefile.PL && make && sudo make install
 ```
@@ -394,7 +394,7 @@ Download and install Continuum
 
 Please report any bugs in the projects bug tracker:
 
-[http://github.com/cpt-octofu/Continuum/issues](http://github.com/cpt-octofu/Continuum/issues)
+[http://github.com/plaprade/Continuum/issues](http://github.com/plaprade/Continuum/issues)
 
 You can also submit a patch.
 
