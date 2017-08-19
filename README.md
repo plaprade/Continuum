@@ -1,3 +1,5 @@
+Continuum has been discontinued and kept here for historical reasons
+
 # NAME
 
 Continuum - A continuation framework for Mojo & AnyEvent
@@ -407,10 +409,3 @@ We're glad you want to contribute! It's simple:
 - Commit your changes `git commit -am 'comments'`
 - Push the branch `git push origin my_branch`
 - Open a pull request
-
-## Supporting
-
-Like what you see? You can support the project by donating in
-[Bitcoins](http://www.weusecoins.com/) to:
-
-__17YWBJUHaiLjZWaCyPwcV8CJDpfoFzc8Gi__
